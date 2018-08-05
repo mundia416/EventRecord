@@ -4,25 +4,28 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Handler
 import android.provider.BaseColumns
-import com.nosetrap.eventrecordlib.ObjectManager
+import android.util.Log
+import com.nosetrap.eventrecordlib.RecorderManager
 import com.nosetrap.eventrecordlib.OnActionTriggerListener
+import com.nosetrap.eventrecordlib.RecorderCallback
 import com.nosetrap.storage.sql.CursorCallback
 import com.nosetrap.storage.sql.EasyCursor
+import com.nosetrap.storage.sql.OrderBy
 
-class ActionRecorder(context: Context) : BaseRecorder(context) {
+class ActionRecorder(context: Context, private val recorderCallback: RecorderCallback) : BaseRecorder(context) {
 
     private val tableName: String
 
     /**
-     * collumn that holds a boolean of when an action is triggered
+     * column that holds a boolean of when an action is triggered
      */
     private val colTrigger = "trigger"
     private val colDuration = "duration"
 
     init {
-        val objectManager = ObjectManager.getInstance(context)
-        objectManager.numActionRecorders++
-        tableName = "action_record_data_${objectManager.numOverlayRecorders}"
+        val recorderManager = RecorderManager.getInstance(context)
+        tableName = "action_record_data_${recorderManager.getActiveActionRecorderCount()}"
+        recorderManager.actionRecorderCreated(tableName)
         databaseHandler.createTable(tableName, arrayOf(colTrigger,colDuration), null)
         setTableName(tableName)
     }
@@ -34,9 +37,37 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
     override fun startRecording() {
         super.startRecording()
 
-        val values = ContentValues()
-        values.put(colTrigger,true)
-        databaseHandler.insert(tableName,values)
+        recorderCallback.onRecordingStarted()
+       // triggerValues.add(true)
+    }
+
+    override fun stopRecording() {
+        super.stopRecording()
+        recorderCallback.onRecordingStopped()
+        //updateElapsedTime()
+        storeRecordingInDatabase()
+    }
+
+    //the values for the table columns
+    private val triggerValues = ArrayList<Boolean>()
+    private val elapsedTimeValues = ArrayList<Long>()
+
+    /**
+     * data is stored in arraylists and then when playback stops it is put in the sqlDatabase
+     */
+    private fun storeRecordingInDatabase(){
+        for(i in 0..(triggerValues.size-1)){
+            val values = ContentValues()
+            values.put(colTrigger,triggerValues[i])
+            values.put(colDuration,elapsedTimeValues[i])
+            databaseHandler.insert(tableName,values)
+
+            //setting the save progress
+            val c: Double = (i.toDouble()/triggerValues.size.toDouble())
+            val percentageProgress: Double = c * 100
+            recorderCallback.onRecordingSaveProgress(percentageProgress)
+        }
+        recorderCallback.onRecordingSaved()
     }
 
     /**
@@ -44,15 +75,28 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
      */
     fun actionPerformed(): Boolean {
         return if (isInRecordMode) {
-            val elapsedTime = calculateElapsedTime()
+           updateElapsedTime()
+            triggerValues.add(true)
 
-            val values = ContentValues()
-            values.put(colDuration, elapsedTime)
-            databaseHandler.update(tableName, values, "${BaseColumns._ID} = '${databaseHandler.getCount(tableName)}'")
             true
         } else {
             false
         }
+    }
+
+
+    /**
+     * update the elapsed time column for the last entry in the table
+     */
+    private fun updateElapsedTime(){
+        val elapsedTime = calculateElapsedTime()
+        elapsedTimeValues.add(elapsedTime)
+        resetElapsedTime()
+    }
+
+    override fun stopPlayback() {
+        super.stopPlayback()
+        recorderCallback.onPlaybackStopped()
     }
 
     /**
@@ -60,6 +104,9 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
      */
     fun startPlayback(onActionTriggerListener: OnActionTriggerListener){
         isInPlayBackMode = true
+
+        recorderCallback.onPrePlayback()
+
         // ensures that recording is turned off
         stopRecording()
 
@@ -78,14 +125,13 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
                     cursor.moveToNext()
                 }
 
+                recorderCallback.onPlaybackStarted()
 
                 //used in the loop in the thread
                 var currentMoveIndex = 0
 
                 //the handler for the background thread
                 val handler = Handler(Handler.Callback {
-
-                    val triggerDuration = triggers[currentMoveIndex]
 
                     if (isInPlayBackMode) {
                         onActionTriggerListener.onTrigger()

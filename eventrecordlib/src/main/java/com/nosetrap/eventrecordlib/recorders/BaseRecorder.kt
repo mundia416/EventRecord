@@ -8,7 +8,7 @@ import com.nosetrap.storage.sql.DatabaseHandler
 /**
  * parent class for recorder objects
  * @param tableName the name of the table which is storing recorded data
- * make sure to always release the recorder when doen by calling release(), this
+ * make sure to always release the recorder when done by calling release(), this
  * is to release any resources the recorder is using, failure to do this will lead
  * to unnecessary memory usage and,memory leaks and unintended consequences
  */
@@ -40,21 +40,26 @@ abstract class BaseRecorder(context: Context) {
 
 
     /** determines whether the views movements are being recorded or not*/
-    protected var isInRecordMode = false
+    private var inRecordModeValue = false
+    protected var isInRecordMode
+        get() = inRecordModeValue
         set(value) {
-            if (isInRecordMode != value) {
-                liveOnRecordingStatusChanged.value = value
-            }
-            isInRecordMode = value
+            if(inRecordModeValue != value){
+            liveOnRecordingStatusChanged.value = value
+                inRecordModeValue = value
+        }
         }
 
+
     /** determines whether the views movements are being played back or not*/
-    protected var isInPlayBackMode = false
+    private var inPlayBackModeValue = false
+    protected var isInPlayBackMode
+        get() = inPlayBackModeValue
         set(value) {
-            if (isInPlayBackMode != value) {
+            if(inPlayBackModeValue != value) {
                 liveOnPlaybackStatusChanged.value = value
+                inPlayBackModeValue = value
             }
-            isInPlayBackMode = value
         }
 
     protected val databaseHandler = DatabaseHandler(context)
@@ -94,6 +99,13 @@ abstract class BaseRecorder(context: Context) {
      */
     protected fun calculateElapsedTime(): Long {
         return System.currentTimeMillis() - resetMillis
+    }
+
+    /**
+     * reset the elapsed time millis variable
+     */
+    protected fun resetElapsedTime(){
+        resetMillis = System.currentTimeMillis()
     }
 
     /**

@@ -8,7 +8,7 @@ android {
     compileSdkVersion 26
     defaultConfig {
         applicationId "com.nosetrap.eventrecord"
-        minSdkVersion 17
+        minSdkVersion 23
         targetSdkVersion 26
         versionCode 1
         versionName "1.0"
@@ -38,8 +38,10 @@ dependencies {
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
-    implementation 'com.github.mundia416:drag:0.0.3'
+    implementation 'com.github.mundia416:drag:0.0.8'
     implementation 'com.github.mundia416:app:0.0.8'
+   // implementation 'com.github.mundia416:permission:0.0.8'
+    implementation 'com.amitshekhar.android:debug-db:1.0.4'
 
     implementation project(':eventrecordlib')
 }
