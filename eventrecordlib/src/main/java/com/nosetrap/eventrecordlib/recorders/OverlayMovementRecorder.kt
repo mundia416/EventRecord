@@ -73,6 +73,9 @@ class OverlayMovementRecorder(private val context: Context,private val recorderC
         if (this.layoutParams == null) {
             throw IllegalStateException("attempted to play without a view(WindowManager.LayoutParams) attached to recorder")
         } else {
+            xValues = ArrayList()
+            yValues = ArrayList()
+            elapsedTimeValues = ArrayList()
             super.startRecording()
             recorderCallback.onRecordingStarted()
 
@@ -134,9 +137,9 @@ class OverlayMovementRecorder(private val context: Context,private val recorderC
         saveRecordingToDatabase()
     }
 
-    private val xValues = ArrayList<Int>()
-    private val yValues = ArrayList<Int>()
-    private val elapsedTimeValues = ArrayList<Long>()
+    private var xValues = ArrayList<Int>()
+    private var yValues = ArrayList<Int>()
+    private var elapsedTimeValues = ArrayList<Long>()
 
     /**
      * save the current x/y coordinates into the database

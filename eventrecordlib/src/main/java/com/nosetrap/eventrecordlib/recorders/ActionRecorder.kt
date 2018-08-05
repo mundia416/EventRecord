@@ -35,6 +35,8 @@ class ActionRecorder(context: Context, private val recorderCallback: RecorderCal
      * is recorded between when the next trigger is recorder, the loop continues
      */
     override fun startRecording() {
+        triggerValues = ArrayList()
+        elapsedTimeValues = ArrayList()
         super.startRecording()
 
         recorderCallback.onRecordingStarted()
@@ -49,8 +51,8 @@ class ActionRecorder(context: Context, private val recorderCallback: RecorderCal
     }
 
     //the values for the table columns
-    private val triggerValues = ArrayList<Boolean>()
-    private val elapsedTimeValues = ArrayList<Long>()
+    private var triggerValues = ArrayList<Boolean>()
+    private var elapsedTimeValues = ArrayList<Long>()
 
     /**
      * data is stored in arraylists and then when playback stops it is put in the sqlDatabase
