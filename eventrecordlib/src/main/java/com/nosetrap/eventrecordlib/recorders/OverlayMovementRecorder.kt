@@ -21,7 +21,7 @@ import com.nosetrap.eventrecordlib.Point
  * make sure a view is assinged to the recorder before using it
  *
  */
-class OverlayMovementRecorder(private val context: Context,private val recorderCallback: RecorderCallback)
+class OverlayMovementRecorder(private val context: Context)
     : BaseRecorder(context) {
     private val tableName: String
 
@@ -57,27 +57,21 @@ class OverlayMovementRecorder(private val context: Context,private val recorderC
         } else {
             this.layoutParams = layoutParams
         }
-
-    }
-
-    override fun stopPlayback() {
-        super.stopPlayback()
-        recorderCallback.onPlaybackStopped()
     }
 
     /**
      * start Recording the movements
      * playback is stopped if it is running when this method is called
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
      */
-    override fun startRecording() {
+    override fun startRecording(reportStopRecording: Boolean) {
         if (this.layoutParams == null) {
             throw IllegalStateException("attempted to play without a view(WindowManager.LayoutParams) attached to recorder")
         } else {
             xValues = ArrayList()
             yValues = ArrayList()
             elapsedTimeValues = ArrayList()
-            super.startRecording()
-            recorderCallback.onRecordingStarted()
+            super.startRecording(reportStopRecording)
 
             saveCurrentXY()
         }
@@ -121,18 +115,19 @@ class OverlayMovementRecorder(private val context: Context,private val recorderC
             //setting the save progress
             val c: Double = (i.toDouble()/xValues.size.toDouble())
             val percentageProgress: Double = c * 100
-            recorderCallback.onRecordingSaveProgress(percentageProgress)
+            recorderCallback?.onRecordingSaveProgress(percentageProgress)
         }
 
-        recorderCallback.onRecordingSaved()
+        recorderCallback?.onRecordingSaved()
     }
 
     /**
      * stop recording movements of the view
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
+
      */
-    override fun stopRecording() {
-        super.stopRecording()
-        recorderCallback.onRecordingStopped()
+    override fun stopRecording(reportStopRecording: Boolean) {
+        super.stopRecording(reportStopRecording)
         saveElapsedTime()
         saveRecordingToDatabase()
     }
@@ -154,8 +149,11 @@ class OverlayMovementRecorder(private val context: Context,private val recorderC
      * playback the recorded movements onto the view
      * recording is stopped if this method is called while recording
      * @param view the view to which the layout params are attached to
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
+     * @param reportPlayBack should the callback method for playback be called
      */
-     fun startPlayback(view: View, onPointChangeListener: OnPointChangeListener? = null) {
+     fun startPlayback(view: View,reportStopRecording: Boolean = false,reportPlayBack: Boolean = true,
+                       onPointChangeListener: OnPointChangeListener? = null) {
         if (!isInPlayBackMode) {
             if (this.layoutParams == null) {
                 throw IllegalStateException("attempted to playBack without a view(WindowManager.LayoutParams) " +
@@ -163,10 +161,12 @@ class OverlayMovementRecorder(private val context: Context,private val recorderC
             } else {
                 isInPlayBackMode = true
 
-                recorderCallback.onPrePlayback()
+                if(reportPlayBack) {
+                    recorderCallback?.onPrePlayback()
+                }
 
                 // ensures that recording is turned off
-                stopRecording()
+                stopRecording(reportStopRecording)
 
                 val pointMoves = ArrayList<PointMove>()
 
@@ -193,7 +193,9 @@ class OverlayMovementRecorder(private val context: Context,private val recorderC
                             cursor.moveToNext()
                         }
 
-                        recorderCallback.onPlaybackStarted()
+                        if(reportPlayBack) {
+                            recorderCallback?.onPlaybackStarted()
+                        }
 
                         //used in the loop in the thread
                         var currentMoveIndex = 0

@@ -40,49 +40,14 @@ class OService : DraggableOverlayService() {
 
         windowManager.addView(view,params)
 
-        movementRecorder = OverlayMovementRecorder(this,object : RecorderCallback(){
-            override fun onRecordingStarted() {
-                super.onRecordingStarted()
-                Toast.makeText(this@OService,"Started Recording",Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onRecordingSaved() {
-                super.onRecordingSaved()
-                Toast.makeText(this@OService,"Stopped Recording",Toast.LENGTH_SHORT).show()
-                Log.d("Recording","stopped")
-
-            }
-
-            override fun onRecordingStopped() {
-                super.onRecordingStopped()
-            }
-
-            override fun onPrePlayback() {
-                super.onPrePlayback()
-            }
-
-            override fun onRecordingSaveProgress(progress: Double) {
-                super.onRecordingSaveProgress(progress)
-            }
-
-            override fun onPlaybackStopped() {
-                super.onPlaybackStopped()
-                Toast.makeText(this@OService,"Stopped Playback",Toast.LENGTH_SHORT).show()
-            }
-
-            override fun onPlaybackStarted() {
-                super.onPlaybackStarted()
-                Toast.makeText(this@OService,"Started Playback",Toast.LENGTH_SHORT).show()
-
-            }
-        })
+        movementRecorder = OverlayMovementRecorder(this)
         movementRecorder.assignView(params)
 
         val triggerOn = "On"
         val triggerOff = "Off"
 
         //prepare the action trigger
-        actionRecorder = ActionRecorder(this,object : RecorderCallback(){})
+        actionRecorder = ActionRecorder(this)
         val trigger = view.findViewById<Button>(R.id.trigger)
         trigger.text = triggerOff
         trigger.setOnClickListener {
@@ -167,5 +132,43 @@ class OService : DraggableOverlayService() {
        registerOnTouchListener(buttonOnTouchListener)
         registerOnTouchListener(viewOnTouchListener)
         registerOnTouchListener(playbackOnTouchListener)
+
+        RecorderManager.getInstance(this).setRecorderCallback(arrayOf(movementRecorder,actionRecorder),
+                object : RecorderCallback{
+            override fun onRecordingStarted() {
+                super.onRecordingStarted()
+                Toast.makeText(this@OService,"Started Recording",Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onRecordingSaved() {
+                super.onRecordingSaved()
+                Toast.makeText(this@OService,"Stopped Recording",Toast.LENGTH_SHORT).show()
+                Log.d("Recording","stopped")
+
+            }
+
+            override fun onRecordingStopped() {
+                super.onRecordingStopped()
+            }
+
+            override fun onPrePlayback() {
+                super.onPrePlayback()
+            }
+
+            override fun onRecordingSaveProgress(progress: Double) {
+                super.onRecordingSaveProgress(progress)
+            }
+
+            override fun onPlaybackStopped() {
+                super.onPlaybackStopped()
+                Toast.makeText(this@OService,"Stopped Playback",Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onPlaybackStarted() {
+                super.onPlaybackStarted()
+                Toast.makeText(this@OService,"Started Playback",Toast.LENGTH_SHORT).show()
+
+            }
+        })
     }
 }

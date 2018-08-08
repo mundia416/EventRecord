@@ -12,7 +12,7 @@ import com.nosetrap.storage.sql.CursorCallback
 import com.nosetrap.storage.sql.EasyCursor
 import com.nosetrap.storage.sql.OrderBy
 
-class ActionRecorder(context: Context, private val recorderCallback: RecorderCallback) : BaseRecorder(context) {
+class ActionRecorder(context: Context) : BaseRecorder(context) {
 
     private val tableName: String
 
@@ -33,20 +33,19 @@ class ActionRecorder(context: Context, private val recorderCallback: RecorderCal
     /**
      * when this is called,an initial trigger is put in the database and the duration
      * is recorded between when the next trigger is recorder, the loop continues
+     * @param reportStartRecording should the callback method for onRecordingStarted be called
      */
-    override fun startRecording() {
+    override fun startRecording(reportStartRecording: Boolean) {
         triggerValues = ArrayList()
         elapsedTimeValues = ArrayList()
-        super.startRecording()
-
-        recorderCallback.onRecordingStarted()
-       // triggerValues.add(true)
+        super.startRecording(reportStartRecording)
     }
 
-    override fun stopRecording() {
-        super.stopRecording()
-        recorderCallback.onRecordingStopped()
-        //updateElapsedTime()
+    /**
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
+     */
+    override fun stopRecording(reportStopRecording: Boolean) {
+        super.stopRecording(reportStopRecording)
         storeRecordingInDatabase()
     }
 
@@ -67,9 +66,9 @@ class ActionRecorder(context: Context, private val recorderCallback: RecorderCal
             //setting the save progress
             val c: Double = (i.toDouble()/triggerValues.size.toDouble())
             val percentageProgress: Double = c * 100
-            recorderCallback.onRecordingSaveProgress(percentageProgress)
+            recorderCallback?.onRecordingSaveProgress(percentageProgress)
         }
-        recorderCallback.onRecordingSaved()
+        recorderCallback?.onRecordingSaved()
     }
 
     /**
@@ -96,21 +95,22 @@ class ActionRecorder(context: Context, private val recorderCallback: RecorderCal
         resetElapsedTime()
     }
 
-    override fun stopPlayback() {
-        super.stopPlayback()
-        recorderCallback.onPlaybackStopped()
-    }
-
     /**
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
+     * @param reportPlayback should the callback method for playback be called
      *
      */
-    fun startPlayback(onActionTriggerListener: OnActionTriggerListener){
+    fun startPlayback(onActionTriggerListener: OnActionTriggerListener,reportStopRecording: Boolean = false,
+                      reportPlayback: Boolean = true){
         isInPlayBackMode = true
 
-        recorderCallback.onPrePlayback()
-
         // ensures that recording is turned off
-        stopRecording()
+        stopRecording(reportStopRecording)
+
+        if(reportPlayback) {
+            recorderCallback?.onPrePlayback()
+        }
+
 
         val triggers = ArrayList<Long>()
 
@@ -127,7 +127,9 @@ class ActionRecorder(context: Context, private val recorderCallback: RecorderCal
                     cursor.moveToNext()
                 }
 
-                recorderCallback.onPlaybackStarted()
+                if(reportPlayback) {
+                    recorderCallback?.onPlaybackStarted()
+                }
 
                 //used in the loop in the thread
                 var currentMoveIndex = 0

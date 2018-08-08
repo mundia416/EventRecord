@@ -3,6 +3,7 @@ package com.nosetrap.eventrecordlib.recorders
 import android.arch.lifecycle.MutableLiveData
 import android.content.Context
 import android.support.annotation.CallSuper
+import com.nosetrap.eventrecordlib.RecorderCallback
 import com.nosetrap.storage.sql.DatabaseHandler
 
 /**
@@ -14,6 +15,19 @@ import com.nosetrap.storage.sql.DatabaseHandler
  */
 abstract class BaseRecorder(context: Context) {
 
+    /**
+     * the recorder callback
+     * only some of the methods are executed from this base class, the rest of the methods
+     * would have to be executed by the child classes of this class
+     * the method which are handled from this class are
+     * onRecordingStarted()
+     * onRecordingStopped()
+     * onPlaybackStopped()
+     * onRecordingDataCleared()
+     */
+    protected var recorderCallback: RecorderCallback? = null
+
+
     private var tableName: String = ""
     /**
      * broadcasts every time the value of isInRecordMode changes
@@ -24,6 +38,13 @@ abstract class BaseRecorder(context: Context) {
      * broadcasts every time the value of isInPlayback changes
      */
     val liveOnPlaybackStatusChanged = MutableLiveData<Boolean>()
+
+    /**
+     * set the recorder callback
+     */
+    fun addRecorderCallback(recorderCallback: RecorderCallback){
+        this.recorderCallback = recorderCallback
+    }
 
     /**
      * set the name of the table which will be used to store data for the recorder
@@ -40,25 +61,21 @@ abstract class BaseRecorder(context: Context) {
 
 
     /** determines whether the views movements are being recorded or not*/
-    private var inRecordModeValue = false
-    protected var isInRecordMode
-        get() = inRecordModeValue
+    protected var isInRecordMode= false
         set(value) {
-            if(inRecordModeValue != value){
+            if(field != value){
             liveOnRecordingStatusChanged.value = value
-                inRecordModeValue = value
+                field = value
         }
         }
 
 
     /** determines whether the views movements are being played back or not*/
-    private var inPlayBackModeValue = false
-    protected var isInPlayBackMode
-        get() = inPlayBackModeValue
+    protected var isInPlayBackMode = false
         set(value) {
-            if(inPlayBackModeValue != value) {
+            if(field != value) {
                 liveOnPlaybackStatusChanged.value = value
-                inPlayBackModeValue = value
+                field = value
             }
         }
 
@@ -78,13 +95,18 @@ abstract class BaseRecorder(context: Context) {
         return isInPlayBackMode
     }
 
+    /**
+     * @param reportRecording should the callback method for onRecordingStopped be called
+     */
     @CallSuper
-    open fun startRecording(){
+    open fun startRecording(reportRecording: Boolean = true){
         stopPlayback()
-
         isInRecordMode = true
-
         resetMillis = System.currentTimeMillis()
+
+        if(reportRecording){
+            recorderCallback?.onRecordingStarted()
+        }
     }
 
     /**
@@ -92,6 +114,7 @@ abstract class BaseRecorder(context: Context) {
      */
     open fun clearRecordingData() {
         databaseHandler.clearTable(tableName)
+        recorderCallback?.onRecordingDataCleared()
     }
 
     /**
@@ -110,17 +133,25 @@ abstract class BaseRecorder(context: Context) {
 
     /**
      * stop recording movements of the view
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
      */
     @CallSuper
-    open fun stopRecording() {
+    open fun stopRecording(reportStopRecording: Boolean = true) {
         isInRecordMode = false
+        if(reportStopRecording) {
+            recorderCallback?.onRecordingStopped()
+        }
     }
 
     /**
      * come out of playback mode
+     * @param reportStopPlayback should the callback method for onRecordingStopped be called
      */
-    open fun stopPlayback() {
+    open fun stopPlayback(reportStopPlayback: Boolean = true) {
         isInPlayBackMode = false
+        if(reportStopPlayback) {
+            recorderCallback?.onPlaybackStopped()
+        }
     }
 
     /**
@@ -129,5 +160,7 @@ abstract class BaseRecorder(context: Context) {
     fun release(){
         databaseHandler.deleteTable(tableName)
     }
+
+
 
 }

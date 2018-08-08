@@ -3,7 +3,7 @@ package com.nosetrap.eventrecordlib
 /**
  * callback interface for the actions that a recorder takes
  */
-abstract class RecorderCallback {
+abstract interface RecorderCallback {
 
     /**
      * is called when recording is started
@@ -18,6 +18,14 @@ abstract class RecorderCallback {
     open fun onRecordingSaved(){
 
     }
+
+    /**
+     * is called after all recording data has been cleare
+     */
+    open fun onRecordingDataCleared(){
+
+    }
+
 
     /**
      * is called when recording is stopped
