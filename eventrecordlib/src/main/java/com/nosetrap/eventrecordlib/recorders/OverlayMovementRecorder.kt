@@ -2,7 +2,9 @@ package com.nosetrap.eventrecordlib.recorders
 
 import android.content.ContentValues
 import android.content.Context
+import android.os.Bundle
 import android.os.Handler
+import android.os.Message
 import android.view.View
 import android.view.WindowManager
 import com.nosetrap.eventrecordlib.*
@@ -63,15 +65,16 @@ class OverlayMovementRecorder(private val context: Context)
      * start Recording the movements
      * playback is stopped if it is running when this method is called
      * @param reportStopRecording should the callback method for onRecordingStopped be called
+     * @param reportPlayback should the callback method for playback be called
      */
-    override fun startRecording(reportStopRecording: Boolean) {
+    override fun startRecording(reportPlayback: Boolean,reportStopRecording: Boolean) {
         if (this.layoutParams == null) {
             throw IllegalStateException("attempted to play without a view(WindowManager.LayoutParams) attached to recorder")
         } else {
             xValues = ArrayList()
             yValues = ArrayList()
             elapsedTimeValues = ArrayList()
-            super.startRecording(reportStopRecording)
+            super.startRecording(reportPlayback,reportStopRecording)
 
             saveCurrentXY()
         }
@@ -103,7 +106,29 @@ class OverlayMovementRecorder(private val context: Context)
         resetElapsedTime()
     }
 
-    private fun saveRecordingToDatabase(){
+    /**
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
+     */
+    private fun saveRecordingToDatabase(reportStopRecording: Boolean){
+        //the key used for the message sent to the recordingProgressHandler
+        val keyProgress = "progress_key"
+
+        val recordingSavedHandler = Handler(Handler.Callback {
+            if(reportStopRecording) {
+                recorderCallback?.onRecordingSaved()
+            }
+                true
+        })
+
+        val recordingProgressHandler = Handler(Handler.Callback {msg ->
+            if(reportStopRecording) {
+                val percentageProgress = msg.data.getDouble(keyProgress, 0.0)
+                recorderCallback?.onRecordingSaveProgress(percentageProgress)
+            }
+            true
+        })
+
+        Thread(Runnable {
         for(i in 0..(xValues.size - 1)){
             val values = ContentValues()
             values.put(colX,xValues[i])
@@ -115,10 +140,16 @@ class OverlayMovementRecorder(private val context: Context)
             //setting the save progress
             val c: Double = (i.toDouble()/xValues.size.toDouble())
             val percentageProgress: Double = c * 100
-            recorderCallback?.onRecordingSaveProgress(percentageProgress)
-        }
 
-        recorderCallback?.onRecordingSaved()
+            val msg = Message()
+            val data = Bundle()
+            data.putDouble(keyProgress,percentageProgress)
+            msg.data = data
+            recordingProgressHandler.sendMessage(msg)
+
+        }
+            recordingSavedHandler.sendEmptyMessage(0)
+        }).start()
     }
 
     /**
@@ -129,7 +160,7 @@ class OverlayMovementRecorder(private val context: Context)
     override fun stopRecording(reportStopRecording: Boolean) {
         super.stopRecording(reportStopRecording)
         saveElapsedTime()
-        saveRecordingToDatabase()
+        saveRecordingToDatabase(reportStopRecording)
     }
 
     private var xValues = ArrayList<Int>()
@@ -166,10 +197,46 @@ class OverlayMovementRecorder(private val context: Context)
                 }
 
                 // ensures that recording is turned off
-                stopRecording(reportStopRecording)
+                if(isInRecordMode) {
+                    stopRecording(reportStopRecording)
+                }
 
                 val pointMoves = ArrayList<PointMove>()
 
+//used in the loop in the thread
+                var currentMoveIndex = 0
+
+                //the handler for the background thread
+                val handler = Handler(Handler.Callback {
+
+                    val pointMove = pointMoves[currentMoveIndex]
+                    if (isInPlayBackMode) {
+                        //put in a try/catch in case this is called while the overlay is not on the screen
+                        try {
+                            layoutParams!!.x = pointMove.point.x
+                            layoutParams!!.y = pointMove.point.y
+
+                            windowManager.updateViewLayout(view, layoutParams)
+
+                            onPointChangeListener?.onChange(Point(layoutParams!!.x, layoutParams!!.y))
+
+                        } catch (e: Exception) {
+                            onPointChangeListener?.onError(e)
+                        }
+                    }
+
+                    true
+                })
+
+
+                val playbackStartedHandler = Handler(Handler.Callback {
+                    recorderCallback?.onPlaybackStarted()
+                    true
+                })
+
+
+                //querring the database and looping through the data is don in a background thread
+                Thread(Runnable {
                 databaseHandler.getAll(object : CursorCallback {
                     override fun onCursorQueried(cursor: EasyCursor) {
                         cursor.moveToFirst()
@@ -194,36 +261,10 @@ class OverlayMovementRecorder(private val context: Context)
                         }
 
                         if(reportPlayBack) {
-                            recorderCallback?.onPlaybackStarted()
+                            playbackStartedHandler.sendEmptyMessage(0)
                         }
 
-                        //used in the loop in the thread
-                        var currentMoveIndex = 0
-
-                        //the handler for the background thread
-                        val handler = Handler(Handler.Callback {
-
-                            val pointMove = pointMoves[currentMoveIndex]
-                            if (isInPlayBackMode) {
-                                //put in a try/catch in case this is called while the overlay is not on the screen
-                                try {
-                                    layoutParams!!.x = pointMove.point.x
-                                    layoutParams!!.y = pointMove.point.y
-
-                                    windowManager.updateViewLayout(view, layoutParams)
-
-                                    onPointChangeListener?.onChange(Point(layoutParams!!.x, layoutParams!!.y))
-
-                                } catch (e: Exception) {
-                                    onPointChangeListener?.onError(e)
-                                }
-                            }
-
-                            true
-                        })
-
                         //loop through the data in a background thread
-                        Thread(Runnable {
                             while (isInPlayBackMode) {
                                 try {
 
@@ -248,9 +289,9 @@ class OverlayMovementRecorder(private val context: Context)
                                     onPointChangeListener?.onError(e)
                                 }
                             }
-                        }).start()
-                    }
-                }, tableName)
+                        }
+                    }, tableName)
+                }).start()
             }
         }
     }

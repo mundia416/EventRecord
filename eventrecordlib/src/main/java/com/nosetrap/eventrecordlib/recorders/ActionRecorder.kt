@@ -2,7 +2,9 @@ package com.nosetrap.eventrecordlib.recorders
 
 import android.content.ContentValues
 import android.content.Context
+import android.os.Bundle
 import android.os.Handler
+import android.os.Message
 import android.provider.BaseColumns
 import android.util.Log
 import com.nosetrap.eventrecordlib.RecorderManager
@@ -34,11 +36,12 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
      * when this is called,an initial trigger is put in the database and the duration
      * is recorded between when the next trigger is recorder, the loop continues
      * @param reportStartRecording should the callback method for onRecordingStarted be called
+     * @param reportPlayback should the callback method for playback be called
      */
-    override fun startRecording(reportStartRecording: Boolean) {
+    override fun startRecording(reportPlayback: Boolean,reportStartRecording: Boolean) {
         triggerValues = ArrayList()
         elapsedTimeValues = ArrayList()
-        super.startRecording(reportStartRecording)
+        super.startRecording(reportPlayback,reportStartRecording)
     }
 
     /**
@@ -46,17 +49,41 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
      */
     override fun stopRecording(reportStopRecording: Boolean) {
         super.stopRecording(reportStopRecording)
-        storeRecordingInDatabase()
+        storeRecordingInDatabase(reportStopRecording)
     }
 
     //the values for the table columns
     private var triggerValues = ArrayList<Boolean>()
     private var elapsedTimeValues = ArrayList<Long>()
 
+
+
     /**
      * data is stored in arraylists and then when playback stops it is put in the sqlDatabase
+     * @param reportStopRecording should the callback method for onRecordingStopped be called
      */
-    private fun storeRecordingInDatabase(){
+    private fun storeRecordingInDatabase(reportStopRecording: Boolean){
+        //the key used for the message sent to the recordingProgressHandler
+        val keyProgress = "progress_key"
+
+        val recordingSavedHandler = Handler(Handler.Callback {
+            if(reportStopRecording) {
+                recorderCallback?.onRecordingSaved()
+            }
+            true
+        })
+
+        val recordingProgressHandler = Handler(Handler.Callback {msg ->
+            val percentageProgress = msg.data.getDouble(keyProgress,0.0)
+            if(reportStopRecording) {
+                recorderCallback?.onRecordingSaveProgress(percentageProgress)
+            }
+            true
+        })
+
+
+
+        Thread(Runnable {
         for(i in 0..(triggerValues.size-1)){
             val values = ContentValues()
             values.put(colTrigger,triggerValues[i])
@@ -66,9 +93,18 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
             //setting the save progress
             val c: Double = (i.toDouble()/triggerValues.size.toDouble())
             val percentageProgress: Double = c * 100
-            recorderCallback?.onRecordingSaveProgress(percentageProgress)
+
+            val msg = Message()
+            val data = Bundle()
+            data.putDouble(keyProgress,percentageProgress)
+            msg.data = data
+            recordingProgressHandler.sendMessage(msg)
+
         }
-        recorderCallback?.onRecordingSaved()
+            recordingSavedHandler.sendEmptyMessage(0)
+    }).start()
+
+
     }
 
     /**
@@ -105,15 +141,34 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
         isInPlayBackMode = true
 
         // ensures that recording is turned off
-        stopRecording(reportStopRecording)
+        if(isInRecordMode) {
+            stopRecording(reportStopRecording)
+        }
 
         if(reportPlayback) {
             recorderCallback?.onPrePlayback()
         }
 
+        //the handler for the background thread
+        val handler = Handler(Handler.Callback {
+
+            if (isInPlayBackMode) {
+                onActionTriggerListener.onTrigger()
+            }
+
+            true
+        })
+
+        val playbackStartedHandler = Handler(Handler.Callback {
+            recorderCallback?.onPlaybackStarted()
+            true
+        })
+
 
         val triggers = ArrayList<Long>()
 
+        //querring the database and looping through the data is all done in a background thread
+        Thread(Runnable {
         databaseHandler.getAll(object : CursorCallback {
             override fun onCursorQueried(cursor: EasyCursor) {
                 cursor.moveToFirst()
@@ -128,24 +183,13 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
                 }
 
                 if(reportPlayback) {
-                    recorderCallback?.onPlaybackStarted()
+                 playbackStartedHandler.sendEmptyMessage(0)
                 }
 
                 //used in the loop in the thread
                 var currentMoveIndex = 0
 
-                //the handler for the background thread
-                val handler = Handler(Handler.Callback {
-
-                    if (isInPlayBackMode) {
-                        onActionTriggerListener.onTrigger()
-                    }
-
-                    true
-                })
-
                 //loop through the data in a background thread
-                Thread(Runnable {
                     while (isInPlayBackMode) {
                         try {
 
@@ -170,9 +214,9 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
                             onActionTriggerListener?.onError(e)
                         }
                     }
-                }).start()
-            }
-        }, tableName)
+                }
+            }, tableName)
+        }).start()
 
     }
 }

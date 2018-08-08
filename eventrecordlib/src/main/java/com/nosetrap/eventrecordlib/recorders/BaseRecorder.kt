@@ -29,15 +29,6 @@ abstract class BaseRecorder(context: Context) {
 
 
     private var tableName: String = ""
-    /**
-     * broadcasts every time the value of isInRecordMode changes
-     */
-    val liveOnRecordingStatusChanged = MutableLiveData<Boolean>()
-
-    /**
-     * broadcasts every time the value of isInPlayback changes
-     */
-    val liveOnPlaybackStatusChanged = MutableLiveData<Boolean>()
 
     /**
      * set the recorder callback
@@ -64,7 +55,6 @@ abstract class BaseRecorder(context: Context) {
     protected var isInRecordMode= false
         set(value) {
             if(field != value){
-            liveOnRecordingStatusChanged.value = value
                 field = value
         }
         }
@@ -74,7 +64,6 @@ abstract class BaseRecorder(context: Context) {
     protected var isInPlayBackMode = false
         set(value) {
             if(field != value) {
-                liveOnPlaybackStatusChanged.value = value
                 field = value
             }
         }
@@ -99,8 +88,10 @@ abstract class BaseRecorder(context: Context) {
      * @param reportRecording should the callback method for onRecordingStopped be called
      */
     @CallSuper
-    open fun startRecording(reportRecording: Boolean = true){
-        stopPlayback()
+    open fun startRecording(reportPlayback: Boolean = false,reportRecording: Boolean = true){
+        if(isInPlayBackMode) {
+            stopPlayback(reportPlayback)
+        }
         isInRecordMode = true
         resetMillis = System.currentTimeMillis()
 

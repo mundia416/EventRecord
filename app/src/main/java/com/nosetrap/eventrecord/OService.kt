@@ -18,7 +18,7 @@ import com.nosetrap.eventrecordlib.recorders.ActionRecorder
 import com.nosetrap.eventrecordlib.recorders.OverlayMovementRecorder
 
 class OService : DraggableOverlayService() {
-    private lateinit var buttonOnTouchListener : DraggableOverlayOnTouchListener
+    private lateinit var playButtonOnTouchListener : DraggableOverlayOnTouchListener
     private lateinit var viewOnTouchListener: DraggableOverlayOnTouchListener
     private lateinit var playbackOnTouchListener:DraggableOverlayOnTouchListener
 
@@ -73,7 +73,7 @@ class OService : DraggableOverlayService() {
 
 
         //instatiating the draggableOverlay OnTouchListeners
-        buttonOnTouchListener = DraggableOverlayOnTouchListener(view,params)
+        playButtonOnTouchListener = DraggableOverlayOnTouchListener(view,params)
         playbackOnTouchListener = DraggableOverlayOnTouchListener(view,params)
         viewOnTouchListener = DraggableOverlayOnTouchListener(view,params)
 
@@ -88,7 +88,7 @@ class OService : DraggableOverlayService() {
         //settings on drag listener
         viewOnTouchListener.setOnDragListener(onDragListener)
         playbackOnTouchListener.setOnDragListener(onDragListener)
-        buttonOnTouchListener.setOnDragListener(onDragListener)
+        playButtonOnTouchListener.setOnDragListener(onDragListener)
 
 
         //setting onClickListeners
@@ -102,7 +102,7 @@ class OService : DraggableOverlayService() {
 
             }
         })
-        buttonOnTouchListener.setOnClickListener(View.OnClickListener {
+        playButtonOnTouchListener.setOnClickListener(View.OnClickListener {
             if(movementRecorder.isRecording()){
                 movementRecorder.stopRecording()
                 actionRecorder.stopRecording()
@@ -119,7 +119,7 @@ class OService : DraggableOverlayService() {
 
 //setting onTouchListeners to the views
         view.setOnTouchListener(viewOnTouchListener)
-        (view.findViewById<Button>(R.id.btn)).setOnTouchListener(buttonOnTouchListener)
+        (view.findViewById<Button>(R.id.btn)).setOnTouchListener(playButtonOnTouchListener)
         (view.findViewById<Button>(R.id.playback)).setOnTouchListener(playbackOnTouchListener)
 
 
@@ -129,7 +129,7 @@ class OService : DraggableOverlayService() {
     }
 
     override fun registerDraggableTouchListener() {
-       registerOnTouchListener(buttonOnTouchListener)
+       registerOnTouchListener(playButtonOnTouchListener)
         registerOnTouchListener(viewOnTouchListener)
         registerOnTouchListener(playbackOnTouchListener)
 
