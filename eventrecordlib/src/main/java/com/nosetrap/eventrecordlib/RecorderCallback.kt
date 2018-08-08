@@ -65,4 +65,11 @@ abstract interface RecorderCallback {
     open fun onPlaybackStopped(){
 
     }
+
+    /**
+     * is called when there is an exception
+     */
+    open fun onError(){
+
+    }
 }

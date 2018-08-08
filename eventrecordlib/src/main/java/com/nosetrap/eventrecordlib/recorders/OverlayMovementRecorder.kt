@@ -239,32 +239,33 @@ class OverlayMovementRecorder(private val context: Context)
                 Thread(Runnable {
                 databaseHandler.getAll(object : CursorCallback {
                     override fun onCursorQueried(cursor: EasyCursor) {
-                        cursor.moveToFirst()
+                        try {
+                            cursor.moveToFirst()
 
-                        for (i in cursor.getCount() downTo 1) {
-                            val x = cursor.getString(colX)
-                            val y = cursor.getString(colY)
-                            val duration: String? = cursor.getString(colDuration)
+                            for (i in cursor.getCount() downTo 1) {
+                                val x = cursor.getString(colX)
+                                val y = cursor.getString(colY)
+                                val duration: String? = cursor.getString(colDuration)
 
-                            pointMoves.add(PointMove(Point(x.toInt(), y.toInt()),
-                                    if (duration != null) {
-                                        if (duration.isNotEmpty()) {
-                                            duration.toLong()
+                                pointMoves.add(PointMove(Point(x.toInt(), y.toInt()),
+                                        if (duration != null) {
+                                            if (duration.isNotEmpty()) {
+                                                duration.toLong()
+                                            } else {
+                                                0
+                                            }
                                         } else {
                                             0
-                                        }
-                                    } else {
-                                        0
-                                    }))
+                                        }))
 
-                            cursor.moveToNext()
-                        }
+                                cursor.moveToNext()
+                            }
 
-                        if(reportPlayBack) {
-                            playbackStartedHandler.sendEmptyMessage(0)
-                        }
+                            if (reportPlayBack) {
+                                playbackStartedHandler.sendEmptyMessage(0)
+                            }
 
-                        //loop through the data in a background thread
+                            //loop through the data in a background thread
                             while (isInPlayBackMode) {
                                 try {
 
@@ -289,7 +290,10 @@ class OverlayMovementRecorder(private val context: Context)
                                     onPointChangeListener?.onError(e)
                                 }
                             }
+                        }catch (e:Exception){
+                            recorderCallbackErrorHandler.sendEmptyMessage(0)
                         }
+                    }
                     }, tableName)
                 }).start()
             }

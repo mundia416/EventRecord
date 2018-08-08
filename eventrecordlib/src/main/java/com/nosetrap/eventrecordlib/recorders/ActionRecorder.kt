@@ -171,25 +171,26 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
         Thread(Runnable {
         databaseHandler.getAll(object : CursorCallback {
             override fun onCursorQueried(cursor: EasyCursor) {
-                cursor.moveToFirst()
+                try {
+                    cursor.moveToFirst()
 
-                for (i in cursor.getCount() downTo 1) {
-                   // val trigger = cursor.getString(colTrigger)
-                    val duration = cursor.getString(colDuration)
+                    for (i in cursor.getCount() downTo 1) {
+                        // val trigger = cursor.getString(colTrigger)
+                        val duration = cursor.getString(colDuration)
 
-                    triggers.add(duration.toLong())
+                        triggers.add(duration.toLong())
 
-                    cursor.moveToNext()
-                }
+                        cursor.moveToNext()
+                    }
 
-                if(reportPlayback) {
-                 playbackStartedHandler.sendEmptyMessage(0)
-                }
+                    if (reportPlayback) {
+                        playbackStartedHandler.sendEmptyMessage(0)
+                    }
 
-                //used in the loop in the thread
-                var currentMoveIndex = 0
+                    //used in the loop in the thread
+                    var currentMoveIndex = 0
 
-                //loop through the data in a background thread
+                    //loop through the data in a background thread
                     while (isInPlayBackMode) {
                         try {
 
@@ -214,7 +215,10 @@ class ActionRecorder(context: Context) : BaseRecorder(context) {
                             onActionTriggerListener?.onError(e)
                         }
                     }
+                } catch (e: Exception) {
+                    recorderCallbackErrorHandler.sendEmptyMessage(0)
                 }
+            }
             }, tableName)
         }).start()
 

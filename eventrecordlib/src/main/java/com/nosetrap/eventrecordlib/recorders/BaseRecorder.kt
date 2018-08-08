@@ -2,6 +2,7 @@ package com.nosetrap.eventrecordlib.recorders
 
 import android.arch.lifecycle.MutableLiveData
 import android.content.Context
+import android.os.Handler
 import android.support.annotation.CallSuper
 import com.nosetrap.eventrecordlib.RecorderCallback
 import com.nosetrap.storage.sql.DatabaseHandler
@@ -26,6 +27,11 @@ abstract class BaseRecorder(context: Context) {
      * onRecordingDataCleared()
      */
     protected var recorderCallback: RecorderCallback? = null
+
+    protected val recorderCallbackErrorHandler = Handler(Handler.Callback {
+        recorderCallback?.onError()
+        true
+    })
 
 
     private var tableName: String = ""
