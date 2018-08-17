@@ -17,7 +17,7 @@ dependencies {
 }
 ```
 
-Recorder
+## Recorder
 Recording is done by the ActionRecorder class
 instantiate the recorder you want to use parameterised with a type parameter of the POJO(data class) you want to use to store data. i.e
 ```
@@ -29,12 +29,13 @@ notify the recorder when the state changes (when values in the POJO(data class) 
              val recordingData = RecordingData(x, y, isChecked)
             recorder.actionPerformed(recordingData)
 ```
-stop recording
+## stop recording
 ```
  actionRecorder.stopRecording()
 ```
 
-start playback. recorded trigger events are recieved in the onTrigger() method of the ActionTriggerListener. the data
+## start playback. 
+recorded trigger events are recieved in the onTrigger() method of the ActionTriggerListener. the data
 is recieved as a JsonObject so using google Gson library you can convert the jsonObject into your POJO(data class) object
 
 ```
