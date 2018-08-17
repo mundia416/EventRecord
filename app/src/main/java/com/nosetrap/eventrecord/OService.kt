@@ -3,31 +3,31 @@ package com.nosetrap.eventrecord
 import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
-import android.util.Log
 import android.view.View
 import android.view.WindowManager
 import android.widget.Button
+import android.widget.Switch
 import android.widget.Toast
+import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.nosetrap.draglib.overlay.DraggableOverlayOnTouchListener
 import com.nosetrap.draglib.overlay.DraggableOverlayService
 import com.nosetrap.draglib.overlay.OnDragListener
-import com.nosetrap.eventrecordlib.OnActionTriggerListener
+import com.nosetrap.eventrecordlib.ActionTriggerListener
 import com.nosetrap.eventrecordlib.RecorderCallback
 import com.nosetrap.eventrecordlib.RecorderManager
 import com.nosetrap.eventrecordlib.recorders.ActionRecorder
-import com.nosetrap.eventrecordlib.recorders.OverlayMovementRecorder
 
 class OService : DraggableOverlayService() {
     private lateinit var playButtonOnTouchListener : DraggableOverlayOnTouchListener
     private lateinit var viewOnTouchListener: DraggableOverlayOnTouchListener
     private lateinit var playbackOnTouchListener:DraggableOverlayOnTouchListener
 
-    private lateinit var movementRecorder: OverlayMovementRecorder
-    private lateinit var actionRecorder: ActionRecorder
+    private lateinit var recorder: ActionRecorder<RecordingData>
 
-    override fun code(intent: Intent) {
+        override fun code(intent: Intent) {
         val view = inflateView(R.layout.overlay)
-       // val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        // val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val params = WindowManager.LayoutParams(WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                         or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
@@ -38,37 +38,30 @@ class OService : DraggableOverlayService() {
         val recorderManager = RecorderManager.getInstance(this)
         recorderManager.releaseAll()
 
-        windowManager.addView(view,params)
+        windowManager.addView(view, params)
 
-        movementRecorder = OverlayMovementRecorder(this)
-        movementRecorder.assignView(params)
-
-        val triggerOn = "On"
-        val triggerOff = "Off"
 
         //prepare the action trigger
-        actionRecorder = ActionRecorder(this)
-        val trigger = view.findViewById<Button>(R.id.trigger)
-        trigger.text = triggerOff
-        trigger.setOnClickListener {
-            actionRecorder.actionPerformed()
-            if(trigger.text.toString().equals(triggerOn)){
-                trigger.text = triggerOff
-            }else{
-                trigger.text = triggerOn
-            }
+        recorder = ActionRecorder(this)
+        val trigger = view.findViewById<Switch>(R.id.trigger)
+
+        trigger.setOnCheckedChangeListener { _, isChecked ->
+            val recordingData = RecordingData(params.x, params.y, isChecked)
+            recorder.actionPerformed(recordingData)
         }
-        val onActionTrigger = object: OnActionTriggerListener{
-            override fun onTrigger() {
-                if(trigger.text.toString().equals(triggerOn)){
-                    trigger.text = triggerOff
-                }else{
-                    trigger.text = triggerOn
-                }
+
+        /**
+         *
+         */
+        val onActionTrigger = object: ActionTriggerListener{
+            override fun onTrigger(data: JsonObject) {
+                val data = Gson().fromJson<RecordingData>(data,RecordingData::class.java)
+                trigger.isChecked = data.trigger
+                params.x = data.x
+                params.y = data.y
+                windowManager.updateViewLayout(view, params)
             }
 
-            override fun onError(e: Throwable) {
-            }
         }
 
 
@@ -80,7 +73,8 @@ class OService : DraggableOverlayService() {
         //onDragListener
         val onDragListener = object: OnDragListener{
             override fun onDrag(view: View) {
-                movementRecorder.viewLocationChanged()
+                val recordingData = RecordingData(params.x, params.y, trigger.isChecked)
+                recorder.actionPerformed(recordingData)
             }
 
         }
@@ -93,25 +87,19 @@ class OService : DraggableOverlayService() {
 
         //setting onClickListeners
         playbackOnTouchListener.setOnClickListener(View.OnClickListener {
-            if(movementRecorder.isInPlayback()){
-                movementRecorder.stopPlayback()
-                actionRecorder.stopPlayback()
+            if(recorder.isInPlayBackMode){
+                recorder.stopPlayback()
             }else{
-                movementRecorder.startPlayback(view)
-                actionRecorder.startPlayback(onActionTrigger)
-
+                recorder.startPlayback(onActionTrigger)
             }
         })
+        //playback button
         playButtonOnTouchListener.setOnClickListener(View.OnClickListener {
-            if(movementRecorder.isRecording()){
-                movementRecorder.stopRecording()
-                actionRecorder.stopRecording()
+            if(recorder.isInRecordMode){
+                recorder.stopRecording()
             }else{
-                movementRecorder.clearRecordingData()
-                movementRecorder.startRecording()
-                actionRecorder.clearRecordingData()
-                actionRecorder.startRecording()
-
+                recorder.clearRecordingData()
+                recorder.startRecording()
             }
         })
 
@@ -121,11 +109,6 @@ class OService : DraggableOverlayService() {
         view.setOnTouchListener(viewOnTouchListener)
         (view.findViewById<Button>(R.id.btn)).setOnTouchListener(playButtonOnTouchListener)
         (view.findViewById<Button>(R.id.playback)).setOnTouchListener(playbackOnTouchListener)
-
-
-
-
-
     }
 
     override fun registerDraggableTouchListener() {
@@ -133,31 +116,42 @@ class OService : DraggableOverlayService() {
         registerOnTouchListener(viewOnTouchListener)
         registerOnTouchListener(playbackOnTouchListener)
 
-        RecorderManager.getInstance(this).setRecorderCallback(arrayOf(movementRecorder,actionRecorder),
-                object : RecorderCallback{
-            override fun onRecordingStarted() {
-                super.onRecordingStarted()
-                Toast.makeText(this@OService,"Started Recording",Toast.LENGTH_SHORT).show()
-            }
+        recorder.setRecorderCallback(object : RecorderCallback{
 
             override fun onRecordingSaved() {
                 super.onRecordingSaved()
-                Toast.makeText(this@OService,"Stopped Recording",Toast.LENGTH_SHORT).show()
-                Log.d("Recording","stopped")
+                Toast.makeText(this@OService,"Saved Recording",Toast.LENGTH_SHORT).show()
 
-            }
-
-            override fun onRecordingStopped() {
-                super.onRecordingStopped()
-            }
-
-            override fun onPrePlayback() {
-                super.onPrePlayback()
             }
 
             override fun onRecordingSaveProgress(progress: Double) {
                 super.onRecordingSaveProgress(progress)
             }
+
+            override fun onRecordingStopped() {
+                super.onRecordingStopped()
+                Toast.makeText(this@OService,"Stopped Recording",Toast.LENGTH_SHORT).show()
+
+            }
+
+            override fun onPrePlayback() {
+                super.onPrePlayback()
+                Toast.makeText(this@OService,"PrePlayback",Toast.LENGTH_SHORT).show()
+
+            }
+
+            override fun onError() {
+                super.onError()
+                Toast.makeText(this@OService,"Error",Toast.LENGTH_SHORT).show()
+
+            }
+
+            override fun onRecordingStarted() {
+                super.onRecordingStarted()
+                Toast.makeText(this@OService,"Started Recording",Toast.LENGTH_SHORT).show()
+            }
+
+
 
             override fun onPlaybackStopped() {
                 super.onPlaybackStopped()

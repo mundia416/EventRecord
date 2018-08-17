@@ -2,7 +2,7 @@ package com.nosetrap.eventrecordlib
 
 import android.content.ContentValues
 import android.content.Context
-import com.nosetrap.eventrecordlib.recorders.BaseRecorder
+import com.nosetrap.eventrecordlib.recorders.ActionRecorder
 import com.nosetrap.storage.sql.CursorCallback
 import com.nosetrap.storage.sql.DatabaseHandler
 import com.nosetrap.storage.sql.EasyCursor
@@ -20,11 +20,10 @@ class RecorderManager private constructor(context: Context){
           var onRecordingStartedCount = 0
         var onPlaybackStartedCount  = 0
         var onPrePlaybackCount = 0
-        var onRecordingSaveProgressCount = 0
         var onRecordingStoppedCount = 0
-        var onRecordingDataClearedCount = 0
-        var onRecordingSavedCount = 0
         var onPlaybackStoppedCount = 0
+        var onRecordingSavedCount = 0
+        var onRecordingSaveProgressCount = 0
 
 
         companion object {
@@ -44,10 +43,10 @@ class RecorderManager private constructor(context: Context){
      * a callback method on @param recorderCallback is only executed after it is executed on
      * all the recorders
      */
-    fun setRecorderCallback(recorders: Array<BaseRecorder>,recorderCallback: RecorderCallback){
+    fun <T>setRecorderCallback(recorders: Array<ActionRecorder<T>>, recorderCallback: RecorderCallback){
         val callbackExtension = RecorderCallbackExtension.getInstance()
         for(recorder in recorders){
-            recorder.addRecorderCallback(object :RecorderCallback{
+            recorder.setRecorderCallback(object :RecorderCallback{
 
                 override fun onRecordingStarted() {
                    callbackExtension.onRecordingStartedCount++
@@ -65,11 +64,11 @@ class RecorderManager private constructor(context: Context){
                     }
                 }
 
-                override fun onRecordingDataCleared() {
-                    callbackExtension.onRecordingDataClearedCount++
-                    if (callbackExtension.onRecordingDataClearedCount == recorders.size){
-                        callbackExtension.onRecordingDataClearedCount = 0
-                        recorderCallback.onRecordingDataCleared()
+                override fun onRecordingSaveProgress(progress: Double) {
+                    callbackExtension.onRecordingSaveProgressCount++
+                    if (callbackExtension.onRecordingSaveProgressCount == recorders.size) {
+                        callbackExtension.onRecordingSaveProgressCount = 0
+                        recorderCallback.onRecordingSaveProgress(progress)
                     }
                 }
 
@@ -78,13 +77,6 @@ class RecorderManager private constructor(context: Context){
                     if (callbackExtension.onRecordingStoppedCount == recorders.size){
                         callbackExtension.onRecordingStoppedCount = 0
                         recorderCallback.onRecordingStopped()
-                    }                }
-
-                override fun onRecordingSaveProgress(progress: Double) {
-                    callbackExtension.onRecordingSaveProgressCount++
-                    if (callbackExtension.onRecordingSaveProgressCount == recorders.size){
-                        callbackExtension.onRecordingSaveProgressCount = 0
-                        recorderCallback.onRecordingSaveProgress(progress)
                     }                }
 
                 override fun onPrePlayback() {
@@ -113,30 +105,16 @@ class RecorderManager private constructor(context: Context){
 
     }
 
-    /**
-     * keeps count of how many OverlayMovementRecorders have been created,this is useful for deciding
-     * the name of the sql table in the recorder
-     */
-    fun getActiveOverlayRecorderCount(): Int{
-        return databaseHandler.getCount(tableNameOverlayRecorders).toInt()
-    }
-
-    /**
-     * keeps count of how many OverlayMovementRecorders have been created,this is useful for deciding
+    /*
+     * keeps count of how many ActionRecorders have been created,this is useful for deciding
      * the name of the sql table
      */
-      fun getActiveActionRecorderCount(): Int {
+      var activeRecorderCount: Int = 0
+    private set
+    get() {
         return databaseHandler.getCount(tableNameActionRecorders).toInt()
     }
 
-    /**
-     * call to tell the recorderManager that a recorder has been created
-     */
-    internal fun overlayRecorderCreated(recorderTableName: String){
-        val values = ContentValues()
-        values.put(colName,recorderTableName)
-        databaseHandler.insert(tableNameOverlayRecorders,values)
-    }
 
 
     /**
@@ -147,11 +125,6 @@ class RecorderManager private constructor(context: Context){
         values.put(colName,recorderTableName)
         databaseHandler.insert(tableNameActionRecorders,values)
     }
-
-    /**
-     * the table that stores the names of the overlay recorders
-     */
-    private val tableNameOverlayRecorders = "overlay_recorder_table_names"
 
     /**
      * the table that stores the names of the overlay recorders
@@ -167,26 +140,11 @@ class RecorderManager private constructor(context: Context){
     private val databaseHandler = DatabaseHandler(context)
 
     init {
-        databaseHandler.createTable(tableNameOverlayRecorders, arrayOf(colName),null)
         databaseHandler.createTable(tableNameActionRecorders, arrayOf(colName),null)
     }
 
-    /**
-     * gets rid of all resources that are being used by all the recorders
-     * i.e deletes database tables
-     */
-    fun releaseAll(){
-        releaseOverlay()
-        releaseAction()
-    }
 
-    /**
-     * gets rid of all resources that are being used by the overlay recorders
-     * i.e deletes database tables
-     */
-    fun releaseOverlay(){
-        release(tableNameOverlayRecorders)
-    }
+
 
     /**
      * contains the logic for releaseOverlay and release action
@@ -213,10 +171,10 @@ class RecorderManager private constructor(context: Context){
     }
 
     /**
-     * gets rid of all resources that are being used by the action recorders
+     * gets rid of all resources that are being used by all the recorders
      * i.e deletes database tables
      */
-    fun releaseAction(){
+    fun releaseAll(){
         release(tableNameActionRecorders)
     }
 

@@ -1,226 +1,223 @@
 package com.nosetrap.eventrecordlib.recorders
 
-import android.content.ContentValues
 import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
-import android.provider.BaseColumns
-import android.util.Log
+import com.nosetrap.eventrecordlib.ActionTriggerListener
 import com.nosetrap.eventrecordlib.RecorderManager
-import com.nosetrap.eventrecordlib.OnActionTriggerListener
 import com.nosetrap.eventrecordlib.RecorderCallback
-import com.nosetrap.storage.sql.CursorCallback
-import com.nosetrap.storage.sql.EasyCursor
-import com.nosetrap.storage.sql.OrderBy
+import com.nosetrap.eventrecordlib.util.PlaybackUtil
+import com.nosetrap.storage.pojo.PojoExtension
+import com.nosetrap.storage.sql.DatabaseHandler
 
-class ActionRecorder(context: Context) : BaseRecorder(context) {
+/**
+ * @classType T specifies the pojo object class type which will be used to store data
+ */
+class ActionRecorder<T>(context: Context) {
 
     private val tableName: String
 
     /**
-     * column that holds a boolean of when an action is triggered
+     * the key for the different pojo object entries which will be inserted into the database
      */
-    private val colTrigger = "trigger"
-    private val colDuration = "duration"
+    internal val keyPojoData = "pojo_key_entry_"
+
+    internal val pojo: PojoExtension
+    private val databaseHandler = DatabaseHandler(context)
+
+    internal var recorderCallback: RecorderCallback? = null
+
+    /**
+     *
+     * */
+    var isInRecordMode = false
+        internal set
+
+    /**
+     *  determines whether the views movements are being played back or not
+     *  */
+    var isInPlayBackMode = false
+        internal set
+
+
+    /**
+     * the milliseconds that the system is currently at when the recording is started or when there
+     *  is an update(when the location of the view changes)
+     *  */
+    private var resetMillis: Long = 0
+
 
     init {
         val recorderManager = RecorderManager.getInstance(context)
-        tableName = "action_record_data_${recorderManager.getActiveActionRecorderCount()}"
+        tableName = "action_record_data_${recorderManager.activeRecorderCount}"
         recorderManager.actionRecorderCreated(tableName)
-        databaseHandler.createTable(tableName, arrayOf(colTrigger,colDuration), null)
-        setTableName(tableName)
+        databaseHandler.createTable(tableName, arrayOf("b"),null)
+        pojo = PojoExtension(context, tableName)
     }
 
     /**
      * when this is called,an initial trigger is put in the database and the duration
      * is recorded between when the next trigger is recorder, the loop continues
-     * @param reportStartRecording should the callback method for onRecordingStarted be called
-     * @param reportPlayback should the callback method for playback be called
      */
-    override fun startRecording(reportPlayback: Boolean,reportStartRecording: Boolean) {
-        triggerValues = ArrayList()
-        elapsedTimeValues = ArrayList()
-        super.startRecording(reportPlayback,reportStartRecording)
-    }
-
-    /**
-     * @param reportStopRecording should the callback method for onRecordingStopped be called
-     */
-    override fun stopRecording(reportStopRecording: Boolean) {
-        super.stopRecording(reportStopRecording)
-        storeRecordingInDatabase(reportStopRecording)
-    }
-
-    //the values for the table columns
-    private var triggerValues = ArrayList<Boolean>()
-    private var elapsedTimeValues = ArrayList<Long>()
-
-
-
-    /**
-     * data is stored in arraylists and then when playback stops it is put in the sqlDatabase
-     * @param reportStopRecording should the callback method for onRecordingStopped be called
-     */
-    private fun storeRecordingInDatabase(reportStopRecording: Boolean){
-        //the key used for the message sent to the recordingProgressHandler
-        val keyProgress = "progress_key"
-
-        val recordingSavedHandler = Handler(Handler.Callback {
-            if(reportStopRecording) {
-                recorderCallback?.onRecordingSaved()
-            }
-            true
-        })
-
-        val recordingProgressHandler = Handler(Handler.Callback {msg ->
-            val percentageProgress = msg.data.getDouble(keyProgress,0.0)
-            if(reportStopRecording) {
-                recorderCallback?.onRecordingSaveProgress(percentageProgress)
-            }
-            true
-        })
-
-
-
-        Thread(Runnable {
-        for(i in 0..(triggerValues.size-1)){
-            val values = ContentValues()
-            values.put(colTrigger,triggerValues[i])
-            values.put(colDuration,elapsedTimeValues[i])
-            databaseHandler.insert(tableName,values)
-
-            //setting the save progress
-            val c: Double = (i.toDouble()/triggerValues.size.toDouble())
-            val percentageProgress: Double = c * 100
-
-            val msg = Message()
-            val data = Bundle()
-            data.putDouble(keyProgress,percentageProgress)
-            msg.data = data
-            recordingProgressHandler.sendMessage(msg)
-
+    fun startRecording() {
+        if (isInPlayBackMode) {
+            stopPlayback()
         }
-            recordingSavedHandler.sendEmptyMessage(0)
-    }).start()
-
-
+        entries.clear()
+        isInRecordMode = true
+        resetMillis = System.currentTimeMillis()
+        recorderCallback?.onRecordingStarted()
     }
+
+    /**
+     * reset the elapsed time millis variable
+     */
+    private fun resetElapsedTime() {
+        resetMillis = System.currentTimeMillis()
+    }
+
+    /**
+     * calculate the time that has elapsed since the last data was inserted in the database
+     */
+    private fun calculateElapsedTime(): Long {
+        return System.currentTimeMillis() - resetMillis
+    }
+
+    /**
+     *  set a recorder callback
+     */
+    fun setRecorderCallback(recorderCallback: RecorderCallback) {
+        this.recorderCallback = recorderCallback
+    }
+
+    /**
+     *
+     * */
+    fun stopRecording() {
+        isInRecordMode = false
+        recorderCallback?.onRecordingStopped()
+        saveToDatabase()
+    }
+
+    /**
+     * get rid of all the recording data that is stored in the database
+     */
+    open fun clearRecordingData() {
+        databaseHandler.clearTable(tableName)
+        pojo.releaseAll()
+        pojo.closeConnection()
+    }
+
+    /**
+     * releases any resources that are being used by this recorder
+     */
+    fun release() {
+        databaseHandler.deleteTable(tableName)
+        pojo.releaseAll()
+        pojo.closeConnection()
+    }
+
+    /**
+     * come out of playback mode
+     */
+    fun stopPlayback() {
+        isInPlayBackMode = false
+        recorderCallback?.onPlaybackStopped()
+    }
+
+    /**
+     * contains the entries of the data to be saved in the database
+     */
+    private val entries = ArrayList<ActionPerformedEntry<T>>()
 
     /**
      * call when an action is performed in order to record it as a trigger
+     * @param data a pojo object which contains data to be recorded
+     * @return true if the recorder is currently in record mode
      */
-    fun actionPerformed(): Boolean {
+    fun actionPerformed(data: T): Boolean {
         return if (isInRecordMode) {
-           updateElapsedTime()
-            triggerValues.add(true)
+            val elapsedTime = calculateElapsedTime()
+            resetElapsedTime()
 
+            val actionPerformedEntry = ActionPerformedEntry(data, elapsedTime)
+            entries.add(actionPerformedEntry)
             true
         } else {
             false
         }
     }
 
+    /**
+     * handler for the background thread which saves to database
+     */
+    private val handlerSaveComplete = Handler(Handler.Callback {
+        recorderCallback?.onRecordingSaved()
+        true
+    })
 
     /**
-     * update the elapsed time column for the last entry in the table
+     * the key used when sending a message from the thread that saves the recorded data into the database
+     * to the handler that shows the progress
      */
-    private fun updateElapsedTime(){
-        val elapsedTime = calculateElapsedTime()
-        elapsedTimeValues.add(elapsedTime)
-        resetElapsedTime()
+    private val keySaveProgress = "keySaveProgress"
+
+    /**
+     * handler to show the progress for the background thread which saves to database
+     */
+    private val handlerSaveProgress = Handler(Handler.Callback {msg ->
+        val index = msg.data.getInt(keySaveProgress)
+
+        val progress = ((index.toDouble()+1.0)/entries.size.toDouble()) * 100.0
+        recorderCallback?.onRecordingSaveProgress(progress)
+        true
+    })
+
+
+    /**
+     * insert the recorded data into the database
+     */
+    private fun saveToDatabase(){
+        Thread(Runnable {
+            for(entry in entries){
+                val entryKey = keyPojoData + pojo.count
+                pojo.insert(entryKey, entry)
+
+                val msg = Message()
+                val data = Bundle()
+                data.putInt(keySaveProgress,entries.indexOf(entry))
+                msg.data = data
+                handlerSaveProgress.sendMessage(msg)
+            }
+            pojo.closeConnection()
+            handlerSaveComplete.sendEmptyMessage(0)
+        }).start()
+
     }
 
     /**
-     * @param reportStopRecording should the callback method for onRecordingStopped be called
-     * @param reportPlayback should the callback method for playback be called
+     * a data class for storing an action performed in the database, it holds the elapsed time
+     */
+    internal data class ActionPerformedEntry<E>(var data: E, var duration: Long)
+
+
+    private val playbackUtil = PlaybackUtil<T>(this)
+
+
+    /**
+     * @param dataClassType the class of the pojo to recieve in the onTrigger method
      *
      */
-    fun startPlayback(onActionTriggerListener: OnActionTriggerListener,reportStopRecording: Boolean = false,
-                      reportPlayback: Boolean = true){
+    fun startPlayback(actionTriggerListener: ActionTriggerListener) {
         isInPlayBackMode = true
 
         // ensures that recording is turned off
         if(isInRecordMode) {
-            stopRecording(reportStopRecording)
+            stopRecording()
         }
+        recorderCallback?.onPrePlayback()
 
-        if(reportPlayback) {
-            recorderCallback?.onPrePlayback()
-        }
-
-        //the handler for the background thread
-        val handler = Handler(Handler.Callback {
-
-            if (isInPlayBackMode) {
-                onActionTriggerListener.onTrigger()
-            }
-
-            true
-        })
-
-        val playbackStartedHandler = Handler(Handler.Callback {
-            recorderCallback?.onPlaybackStarted()
-            true
-        })
-
-
-        val triggers = ArrayList<Long>()
-
-        //querring the database and looping through the data is all done in a background thread
-        Thread(Runnable {
-        databaseHandler.getAll(object : CursorCallback {
-            override fun onCursorQueried(cursor: EasyCursor) {
-                try {
-                    cursor.moveToFirst()
-
-                    for (i in cursor.getCount() downTo 1) {
-                        // val trigger = cursor.getString(colTrigger)
-                        val duration = cursor.getString(colDuration)
-
-                        triggers.add(duration.toLong())
-
-                        cursor.moveToNext()
-                    }
-
-                    if (reportPlayback) {
-                        playbackStartedHandler.sendEmptyMessage(0)
-                    }
-
-                    //used in the loop in the thread
-                    var currentMoveIndex = 0
-
-                    //loop through the data in a background thread
-                    while (isInPlayBackMode) {
-                        try {
-
-                            //looping to delay by the specified number of milliseconds
-                            val initialTime = System.currentTimeMillis();
-                            val expectedTime = initialTime + triggers[currentMoveIndex]
-
-                            while (System.currentTimeMillis() <= expectedTime) {
-                                //do nothing
-                            }
-
-                            if (currentMoveIndex == (triggers.size - 1)) {
-                                //when its on the last pointer move then restart the moves starting from the first move
-                                currentMoveIndex = 0
-                            } else {
-                                //go to next pointer move
-                                currentMoveIndex++
-                            }
-
-                            handler.sendEmptyMessage(0)
-                        } catch (e: Exception) {
-                            onActionTriggerListener?.onError(e)
-                        }
-                    }
-                } catch (e: Exception) {
-                    recorderCallbackErrorHandler.sendEmptyMessage(0)
-                }
-            }
-            }, tableName)
-        }).start()
-
+        playbackUtil.startPlayback(actionTriggerListener)
     }
 }

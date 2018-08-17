@@ -3,7 +3,7 @@ package com.nosetrap.eventrecordlib
 /**
  * callback interface for the actions that a recorder takes
  */
-abstract interface RecorderCallback {
+ interface RecorderCallback {
 
     /**
      * is called when recording is started
@@ -11,30 +11,13 @@ abstract interface RecorderCallback {
      open fun onRecordingStarted(){
     }
 
-    /**
-     * is called after the recording is saved in the database
-     * is called after onRecordingSaveProgress(...) finishes its progress
-     */
-    open fun onRecordingSaved(){
+   /**
+    * is called after the recording is saved in the database
+    * is called after onRecordingSaveProgress(...) finishes its progress
+    */
+   open fun onRecordingSaved(){
 
-    }
-
-    /**
-     * is called after all recording data has been cleare
-     */
-    open fun onRecordingDataCleared(){
-
-    }
-
-
-    /**
-     * is called when recording is stopped
-     * is called before onRecordingSaveProgress(...) starts getting called
-     *
-     */
-    open fun onRecordingStopped(){
-
-    }
+   }
 
     /**
      * is called to show the progress of saving the data in the sql database
@@ -46,12 +29,22 @@ abstract interface RecorderCallback {
     }
 
     /**
-     * is called when before querry is made to the database for the recording. this is the method to
+     * is called when recording is stopped
+     * is called before onRecordingSaveProgress(...) starts getting called
+     *
+     */
+    open fun onRecordingStopped(){
+
+    }
+
+    /**
+     * is called before query is made to the database for the recording. this is the method to
      * add any progressbars
      */
     open fun onPrePlayback(){
 
     }
+
     /**
      * isCalled when the playback is ready to start
      */
