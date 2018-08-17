@@ -192,6 +192,7 @@ class ActionRecorder<T>(context: Context) {
             }
             pojo.closeConnection()
             handlerSaveComplete.sendEmptyMessage(0)
+            playbackReadyListener.onReady()
         }).start()
 
     }
@@ -205,19 +206,33 @@ class ActionRecorder<T>(context: Context) {
     private val playbackUtil = PlaybackUtil<T>(this)
 
 
+    private val playbackReadyListener = object: PlaybackUtil.PlaybackReadyListener{
+        override fun onReady() {
+            if(isInPlayBackMode) {
+                playbackUtil.startPlayback(actionTriggerListener!!)
+            }
+        }
+    }
+
+    private var actionTriggerListener: ActionTriggerListener? = null
     /**
      * @param dataClassType the class of the pojo to recieve in the onTrigger method
      *
      */
     fun startPlayback(actionTriggerListener: ActionTriggerListener) {
+        this.actionTriggerListener = actionTriggerListener
         isInPlayBackMode = true
+
+        recorderCallback?.onPrePlayback()
 
         // ensures that recording is turned off
         if(isInRecordMode) {
             stopRecording()
+        }else{
+            playbackReadyListener.onReady()
         }
-        recorderCallback?.onPrePlayback()
 
-        playbackUtil.startPlayback(actionTriggerListener)
+
+
     }
 }

@@ -113,4 +113,14 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
             }
         })
     }
+
+    /**
+     * an internal interface that calls when the recorder is ready to playback
+     */
+    internal interface PlaybackReadyListener{
+        /**
+         * is called after a recording has been saved, this is when the recorder is ready to playback
+         */
+        fun onReady()
+    }
 }
