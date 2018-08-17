@@ -1,5 +1,5 @@
 # eventrecord
-library to record different types of events and be able to play them back
+library to record different types of events and be able to play them back. it works by storing a Plain Old java objects into an sql database and playing them back at exact time intervals as they were inserted in.
 
 ## Usage
 
@@ -13,41 +13,40 @@ repositories {
 add the library to your module dependency
 ```
 dependencies {
-    implementation 'com.github.mundia416:eventrecord:0.0.9'
+    implementation 'com.github.mundia416:eventrecord:{LATEST_RELEASE}'
 }
 ```
 
-## Types Of Recorders
-1.  OverlayMovementRecorder -
-records and plays back the movements of an inflated overlay view
-2.  ActionRecorder -
-records trigger events and plays back those trigger events at exact time intervals
-
-
-instantiate the recorder you want to use . i.e
+## Recorder
+Recording is done by the ActionRecorder class
+instantiate the recorder you want to use parameterised with a type parameter of the POJO(data class) you want to use to store data. i.e
 ```
-val actionRecorder = ActionRecorder(context)
+        recorder = ActionRecorder<RecordingData>(this)
 ```
 
-notify the recorder when the state changes
+notify the recorder when the state changes (when values in the POJO(data class) change
 ```
-            actionRecorder.actionPerformed()
+             val recordingData = RecordingData(x, y, isChecked)
+            recorder.actionPerformed(recordingData)
 ```
-stop recording
+## stop recording
 ```
  actionRecorder.stopRecording()
 ```
 
-start playback. recorded trigger events are recieved in the onTrigger() method of the OnActionTriggerListener 
-```
-actionRecorder.startPlayback(object: OnActionTriggerListener{
-    override fun onTrigger() {
-        //do something
-    }
+## start playback. 
+recorded trigger events are recieved in the onTrigger() method of the ActionTriggerListener. the data
+is recieved as a JsonObject so using google Gson library you can convert the jsonObject into your POJO(data class) object
 
-    override fun onError(e: Throwable) {
-        //handle error
-    }
+```
+    
+        val actionTrigger = object: ActionTriggerListener{
+            override fun onTrigger(data: JsonObject) {
+                val recordingData = Gson().fromJson<RecordingData>(data,RecordingData::class.java)
+                
+            }
+
+        }
 })
 ```
 
