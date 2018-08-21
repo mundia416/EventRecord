@@ -214,7 +214,7 @@ class ActionRecorder<T>(context: Context) {
         }
     }
 
-    private var actionTriggerListener: ActionTriggerListener? = null
+    private var  actionTriggerListener: ActionTriggerListener? = null
     /**
      * @param dataClassType the class of the pojo to recieve in the onTrigger method
      *

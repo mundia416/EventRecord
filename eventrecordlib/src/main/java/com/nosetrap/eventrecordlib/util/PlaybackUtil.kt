@@ -44,10 +44,14 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
      * the actionHandler that tells the action trigger when to execute
      */
     private val actionHandler = Handler(Handler.Callback {
-        if (actionRecorder.isInPlayBackMode) {
-            val linkedTreeMap = entryArray[currentMoveIndex].data
-            val data = Gson().toJsonTree(linkedTreeMap)
-            actionTriggerListener!!.onTrigger(data.asJsonObject)
+        try {
+            if (actionRecorder.isInPlayBackMode) {
+                val linkedTreeMap = entryArray[currentMoveIndex].data
+                val data = Gson().toJsonTree(linkedTreeMap)
+                actionTriggerListener!!.onTrigger(data.asJsonObject)
+            }
+        }catch (e: Exception){
+            recorderCallbackErrorHandler.sendEmptyMessage(0)
         }
 
         true
