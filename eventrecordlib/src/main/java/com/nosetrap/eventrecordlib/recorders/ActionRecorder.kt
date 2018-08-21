@@ -175,24 +175,32 @@ class ActionRecorder<T>(context: Context) {
     })
 
 
+    private val errorHandler = Handler(Handler.Callback {
+        recorderCallback?.onError()
+        true
+    })
     /**
      * insert the recorded data into the database
      */
     private fun saveToDatabase(){
         Thread(Runnable {
-            for(entry in entries){
-                val entryKey = keyPojoData + pojo.count
-                pojo.insert(entryKey, entry)
+            try {
+                for (entry in entries) {
+                    val entryKey = keyPojoData + pojo.count
+                    pojo.insert(entryKey, entry)
 
-                val msg = Message()
-                val data = Bundle()
-                data.putInt(keySaveProgress,entries.indexOf(entry))
-                msg.data = data
-                handlerSaveProgress.sendMessage(msg)
+                    val msg = Message()
+                    val data = Bundle()
+                    data.putInt(keySaveProgress, entries.indexOf(entry))
+                    msg.data = data
+                    handlerSaveProgress.sendMessage(msg)
+                }
+                pojo.closeConnection()
+                handlerSaveComplete.sendEmptyMessage(0)
+                playbackReadyListener.onReady()
+            }catch (e: Exception){
+                errorHandler.sendEmptyMessage(0)
             }
-            pojo.closeConnection()
-            handlerSaveComplete.sendEmptyMessage(0)
-            playbackReadyListener.onReady()
         }).start()
 
     }
