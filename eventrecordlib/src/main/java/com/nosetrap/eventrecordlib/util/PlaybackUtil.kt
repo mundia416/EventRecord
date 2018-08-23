@@ -17,6 +17,11 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
     private var entryArray = ArrayList<ActionRecorder.ActionPerformedEntry<T>>()
 
 
+    /**
+     * shows the current times it has played back
+     */
+    var currentPlaybackRun: Int = 0
+
     //used in the loop in the thread
     private var currentMoveIndex = 0
 
@@ -39,6 +44,10 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
         true
     })
 
+    private val stopPlaybackHandler = Handler(Handler.Callback {
+        actionRecorder.stopPlayback()
+        true
+    })
 
     /**
      * the actionHandler that tells the action trigger when to execute
@@ -68,6 +77,7 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
         this.actionTriggerListener = actionTriggerListener
         entryArray = ArrayList()
         currentMoveIndex = 0
+        currentPlaybackRun = 0
 
         getThread().start()
     }
@@ -103,12 +113,17 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
                         if (currentMoveIndex == (entryArray.size - 1)) {
                             //when its on the last pointer move then restart the moves starting from the first move
                             currentMoveIndex = 0
+                            currentPlaybackRun++
                         } else {
                             //go to next pointer move
                             currentMoveIndex++
                         }
 
                         actionHandler.sendEmptyMessage(0)
+
+                        if(actionRecorder.playbackLimit != 0 && currentPlaybackRun >= actionRecorder.playbackLimit){
+                            stopPlaybackHandler.sendEmptyMessage(0)
+                        }
                     } catch (e: Exception) {}
                 }
             } catch (e: Exception) {

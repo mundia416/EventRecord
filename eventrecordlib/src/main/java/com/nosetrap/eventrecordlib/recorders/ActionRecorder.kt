@@ -213,6 +213,17 @@ class ActionRecorder<T>(context: Context) {
 
     private val playbackUtil = PlaybackUtil<T>(this)
 
+    /**
+     * shows the current times it has played back
+     */
+    private val currentPlaybackRun: Int
+    get() = playbackUtil.currentPlaybackRun
+
+    /**
+     * set a limit on the number of times the recorder should playbay,
+     *  0 means it will playback unlimited
+     */
+    var playbackLimit = 0
 
     private val playbackReadyListener = object: PlaybackUtil.PlaybackReadyListener{
         override fun onReady() {
