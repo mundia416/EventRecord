@@ -18,7 +18,7 @@ dependencies {
 ```
 
 ## Recorder
-Recording is done by the ActionRecorder class
+Recording is done by the different types of recorders which can be found in the .recorder package
 instantiate the recorder you want to use parameterised with a type parameter of the POJO(data class) you want to use to store data. i.e
 ```
         recorder = ActionRecorder<RecordingData>(this)
