@@ -23,4 +23,12 @@
         tools:layout_editor_absoluteX="104dp"
         tools:layout_editor_absoluteY="109dp" />
 
+    <Button
+        android:id="@+id/btnF"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="8dp"
+        android:text="F"
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:layout_editor_absoluteY="191dp" />
 </android.support.constraint.ConstraintLayout>

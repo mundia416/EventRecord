@@ -2,7 +2,8 @@ package com.nosetrap.eventrecordlib
 
 import android.content.ContentValues
 import android.content.Context
-import com.nosetrap.eventrecordlib.recorders.ActionRecorder
+import com.nosetrap.eventrecordlib.callback.RecorderCallback
+import com.nosetrap.eventrecordlib.recorder.ActionRecorder
 import com.nosetrap.storage.sql.CursorCallback
 import com.nosetrap.storage.sql.DatabaseHandler
 import com.nosetrap.storage.sql.EasyCursor
@@ -46,7 +47,7 @@ class RecorderManager private constructor(context: Context){
     fun <T>setRecorderCallback(recorders: Array<ActionRecorder<T>>, recorderCallback: RecorderCallback){
         val callbackExtension = RecorderCallbackExtension.getInstance()
         for(recorder in recorders){
-            recorder.setRecorderCallback(object :RecorderCallback{
+            recorder.setRecorderCallback(object : RecorderCallback {
 
                 override fun onRecordingStarted() {
                    callbackExtension.onRecordingStartedCount++

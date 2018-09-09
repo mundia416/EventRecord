@@ -1,20 +1,22 @@
 package com.nosetrap.eventrecordlib.util
 
+import android.os.Bundle
 import android.os.Handler
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.nosetrap.eventrecordlib.ActionTriggerListener
-import com.nosetrap.eventrecordlib.recorders.ActionRecorder
+import com.nosetrap.eventrecordlib.recorder.ActionRecorder
+import com.nosetrap.eventrecordlib.recorder.BaseActionRecorder
 
 /**
  * utility class to handle playback function
  * @classType T specify the type of pojo object that is being played back
  */
-internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
+internal class PlaybackUtil<T>(private val actionRecorder: BaseActionRecorder<T>) {
     /**
      * an array that holds all the data that was recorded into the database
      */
-    private var entryArray = ArrayList<ActionRecorder.ActionPerformedEntry<T>>()
+    private var entryArray = ArrayList<BaseActionRecorder.ActionPerformedEntry<T>>()
 
 
     /**
@@ -35,12 +37,14 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
         true
     })
 
+    private var lastKnownException = Exception()
+
     /**
      * a actionHandler that tels the recorder callback that there is an error
      */
     private val recorderCallbackErrorHandler = Handler(Handler.Callback {
         actionRecorder.stopPlayback()
-        actionRecorder.recorderCallback?.onError()
+        actionRecorder.recorderCallback?.onError(lastKnownException)
         true
     })
 
@@ -60,6 +64,7 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
                 actionTriggerListener!!.onTrigger(data.asJsonObject)
             }
         }catch (e: Exception){
+            lastKnownException = e
             recorderCallbackErrorHandler.sendEmptyMessage(0)
         }
 
@@ -92,8 +97,8 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
 
                 for (i in 0..(actionRecorder.pojo.count - 1)) {
                     val key = actionRecorder.keyPojoData + i
-                    val typeToken = object: TypeToken<ActionRecorder.ActionPerformedEntry<T>>() {}.type
-                    val dataEntry = actionRecorder.pojo.get<ActionRecorder.ActionPerformedEntry<T>>(key, typeToken)
+                    val typeToken = object: TypeToken<BaseActionRecorder.ActionPerformedEntry<T>>() {}.type
+                    val dataEntry = actionRecorder.pojo.get<BaseActionRecorder.ActionPerformedEntry<T>>(key, typeToken)
                     entryArray.add(dataEntry)
                 }
                 actionRecorder.pojo.closeConnection()
@@ -121,13 +126,14 @@ internal class PlaybackUtil<T>(private val actionRecorder: ActionRecorder<T>) {
 
                         actionHandler.sendEmptyMessage(0)
 
-                        if(actionRecorder.playbackLimit != 0 && currentPlaybackRun >= actionRecorder.playbackLimit){
+                        if(actionRecorder.playbackLimit != BaseActionRecorder.PLAYBACK_UNLIMITED &&
+                                currentPlaybackRun >= actionRecorder.playbackLimit){
                             stopPlaybackHandler.sendEmptyMessage(0)
                         }
                     } catch (e: Exception) {}
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                lastKnownException = e
                 recorderCallbackErrorHandler.sendEmptyMessage(0)
             }
         })

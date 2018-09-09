@@ -1,43 +1,22 @@
-package com.nosetrap.eventrecordlib.recorders
+package com.nosetrap.eventrecordlib.recorder
 
 import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Message
 import com.nosetrap.eventrecordlib.ActionTriggerListener
-import com.nosetrap.eventrecordlib.RecorderManager
-import com.nosetrap.eventrecordlib.RecorderCallback
+import com.nosetrap.eventrecordlib.callback.RecorderCallback
 import com.nosetrap.eventrecordlib.util.PlaybackUtil
-import com.nosetrap.storage.pojo.PojoExtension
-import com.nosetrap.storage.sql.DatabaseHandler
 
 /**
- * @classType T specifies the pojo object class type which will be used to store data
+ * action recorder that records the actions with the time between actions being calculated in realtime (elapsed real time)
  */
-class ActionRecorder<T>(context: Context) {
-
-    private val tableName: String
-
-    /**
-     * the key for the different pojo object entries which will be inserted into the database
-     */
-    internal val keyPojoData = "pojo_key_entry_"
-
-    internal val pojo: PojoExtension
-    private val databaseHandler = DatabaseHandler(context)
-
-    internal var recorderCallback: RecorderCallback? = null
+class ActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
 
     /**
      *
      * */
     var isInRecordMode = false
-        internal set
-
-    /**
-     *  determines whether the views movements are being played back or not
-     *  */
-    var isInPlayBackMode = false
         internal set
 
 
@@ -47,14 +26,6 @@ class ActionRecorder<T>(context: Context) {
      *  */
     private var resetMillis: Long = 0
 
-
-    init {
-        val recorderManager = RecorderManager.getInstance(context)
-        tableName = "action_record_data_${recorderManager.activeRecorderCount}"
-        recorderManager.actionRecorderCreated(tableName)
-        databaseHandler.createTable(tableName, arrayOf("b"),null)
-        pojo = PojoExtension(context, tableName)
-    }
 
     /**
      * when this is called,an initial trigger is put in the database and the duration
@@ -67,7 +38,7 @@ class ActionRecorder<T>(context: Context) {
         entries.clear()
         isInRecordMode = true
         resetMillis = System.currentTimeMillis()
-        recorderCallback?.onRecordingStarted()
+        (recorderCallback as RecorderCallback).onRecordingStarted()
     }
 
     /**
@@ -78,7 +49,7 @@ class ActionRecorder<T>(context: Context) {
     }
 
     /**
-     * calculate the time that has elapsed since the last data was inserted in the database
+     * calculate the time that hasb elapsed since the last data was inserted in the database
      */
     private fun calculateElapsedTime(): Long {
         return System.currentTimeMillis() - resetMillis
@@ -96,35 +67,11 @@ class ActionRecorder<T>(context: Context) {
      * */
     fun stopRecording() {
         isInRecordMode = false
-        recorderCallback?.onRecordingStopped()
+        (recorderCallback as RecorderCallback).onRecordingStopped()
         saveToDatabase()
     }
 
-    /**
-     * get rid of all the recording data that is stored in the database
-     */
-    open fun clearRecordingData() {
-        databaseHandler.clearTable(tableName)
-        pojo.releaseAll()
-        pojo.closeConnection()
-    }
 
-    /**
-     * releases any resources that are being used by this recorder
-     */
-    fun release() {
-        databaseHandler.deleteTable(tableName)
-        pojo.releaseAll()
-        pojo.closeConnection()
-    }
-
-    /**
-     * come out of playback mode
-     */
-    fun stopPlayback() {
-        isInPlayBackMode = false
-        recorderCallback?.onPlaybackStopped()
-    }
 
     /**
      * contains the entries of the data to be saved in the database
@@ -153,7 +100,7 @@ class ActionRecorder<T>(context: Context) {
      * handler for the background thread which saves to database
      */
     private val handlerSaveComplete = Handler(Handler.Callback {
-        recorderCallback?.onRecordingSaved()
+        (recorderCallback as RecorderCallback).onRecordingSaved()
         true
     })
 
@@ -170,15 +117,12 @@ class ActionRecorder<T>(context: Context) {
         val index = msg.data.getInt(keySaveProgress)
 
         val progress = ((index.toDouble()+1.0)/entries.size.toDouble()) * 100.0
-        recorderCallback?.onRecordingSaveProgress(progress)
+        (recorderCallback as RecorderCallback).onRecordingSaveProgress(progress)
         true
     })
 
 
-    private val errorHandler = Handler(Handler.Callback {
-        recorderCallback?.onError()
-        true
-    })
+
     /**
      * insert the recorded data into the database
      */
@@ -199,41 +143,13 @@ class ActionRecorder<T>(context: Context) {
                 handlerSaveComplete.sendEmptyMessage(0)
                 playbackReadyListener.onReady()
             }catch (e: Exception){
+                lastKnownException = e
                 errorHandler.sendEmptyMessage(0)
             }
         }).start()
 
     }
 
-    /**
-     * a data class for storing an action performed in the database, it holds the elapsed time
-     */
-    internal data class ActionPerformedEntry<E>(var data: E, var duration: Long)
-
-
-    private val playbackUtil = PlaybackUtil<T>(this)
-
-    /**
-     * shows the current times it has played back
-     */
-    private val currentPlaybackRun: Int
-    get() = playbackUtil.currentPlaybackRun
-
-    /**
-     * set a limit on the number of times the recorder should playbay,
-     *  0 means it will playback unlimited
-     */
-    var playbackLimit = 0
-
-    private val playbackReadyListener = object: PlaybackUtil.PlaybackReadyListener{
-        override fun onReady() {
-            if(isInPlayBackMode) {
-                playbackUtil.startPlayback(actionTriggerListener!!)
-            }
-        }
-    }
-
-    private var  actionTriggerListener: ActionTriggerListener? = null
     /**
      * @param dataClassType the class of the pojo to recieve in the onTrigger method
      *
@@ -250,8 +166,5 @@ class ActionRecorder<T>(context: Context) {
         }else{
             playbackReadyListener.onReady()
         }
-
-
-
     }
 }

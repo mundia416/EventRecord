@@ -14,9 +14,9 @@ import com.nosetrap.draglib.overlay.DraggableOverlayOnTouchListener
 import com.nosetrap.draglib.overlay.DraggableOverlayService
 import com.nosetrap.draglib.overlay.OnDragListener
 import com.nosetrap.eventrecordlib.ActionTriggerListener
-import com.nosetrap.eventrecordlib.RecorderCallback
+import com.nosetrap.eventrecordlib.callback.RecorderCallback
 import com.nosetrap.eventrecordlib.RecorderManager
-import com.nosetrap.eventrecordlib.recorders.ActionRecorder
+import com.nosetrap.eventrecordlib.recorder.ActionRecorder
 
 class OService : DraggableOverlayService() {
     private lateinit var playButtonOnTouchListener : DraggableOverlayOnTouchListener
@@ -116,7 +116,7 @@ class OService : DraggableOverlayService() {
         registerOnTouchListener(viewOnTouchListener)
         registerOnTouchListener(playbackOnTouchListener)
 
-        recorder.setRecorderCallback(object : RecorderCallback{
+        recorder.setRecorderCallback(object : RecorderCallback {
 
             override fun onRecordingSaved() {
                 super.onRecordingSaved()
@@ -140,8 +140,7 @@ class OService : DraggableOverlayService() {
 
             }
 
-            override fun onError() {
-                super.onError()
+            override fun onError(e: Exception) {
                 Toast.makeText(this@OService,"Error",Toast.LENGTH_SHORT).show()
 
             }
