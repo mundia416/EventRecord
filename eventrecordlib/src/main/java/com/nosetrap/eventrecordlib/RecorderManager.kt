@@ -223,7 +223,7 @@ class RecorderManager private constructor(context: Context){
     fun deleteRecording(recordingId: Int){
         val recordingTableName = IDUtil.toRecordingTableName(recordingId)
         databaseHandlerExtension.removeRows(tableNameRecorderRecordings,
-                "$colRecordingTableName == $recordingTableName")
+                "$colRecordingTableName == '$recordingTableName'")
         databaseHandler.deleteTable(recordingTableName)
     }
 
