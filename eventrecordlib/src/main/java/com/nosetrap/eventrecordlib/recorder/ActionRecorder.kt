@@ -166,7 +166,6 @@ class ActionRecorder<T>(private val context: Context,private val id: Int) : Base
         isInPlayBackMode = true
 
         recorderCallback?.onPrePlayback()
-
         // ensures that recording is turned off
         if(isInRecordMode) {
             stopRecording()

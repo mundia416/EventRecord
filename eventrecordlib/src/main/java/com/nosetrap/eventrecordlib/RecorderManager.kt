@@ -148,6 +148,8 @@ class RecorderManager private constructor(private val context: Context){
     private val colTitle = "title"
     private val databaseHandler = DatabaseHandler(context)
     private val databaseHandlerExtension = DatabaseHandlerExtension(context)
+    private val pojoDatabaseHandlerExt = DatabaseHandlerExtension(context,"pojo_objects_database_name")
+
 
 
     init {
@@ -190,12 +192,13 @@ class RecorderManager private constructor(private val context: Context){
                 cursor.iterate(object : IterateListener{
                     override fun onNext(cursor: EasyCursor) {
                         val recordingTableName = cursor.getString(colRecordingTableName)
-                        databaseHandlerExtension.deleteTable(recordingTableName)
+                        pojoDatabaseHandlerExt.deleteTable(recordingTableName)
                     }
                 })
             }
         },tableNameRecorderRecordings,arrayOf(colRecordingTableName))
         databaseHandlerExtension.closeConnection()
+        pojoDatabaseHandlerExt.closeConnection()
     }
 
         /**
@@ -207,7 +210,7 @@ class RecorderManager private constructor(private val context: Context){
                 cursor.iterate(object : IterateListener{
                     override fun onNext(cursor: EasyCursor) {
                         val recordingTableName = cursor.getString(colRecordingTableName)
-                        databaseHandlerExtension.deleteTable(recordingTableName)
+                        pojoDatabaseHandlerExt.deleteTable(recordingTableName)
 
                     }
                 })
@@ -215,6 +218,7 @@ class RecorderManager private constructor(private val context: Context){
         },tableNameRecorderRecordings,
                 arrayOf(colRecordingTableName),"$colRecorderID == $recorderId")
         databaseHandlerExtension.closeConnection()
+            pojoDatabaseHandlerExt.closeConnection()
     }
 
     /**
@@ -225,8 +229,8 @@ class RecorderManager private constructor(private val context: Context){
         databaseHandlerExtension.removeRows(tableNameRecorderRecordings,
                 "$colRecordingTableName == '$recordingTableName'")
 
-        val pojo = Pojo(context,recordingTableName)
-        pojo.releaseAll()
+        pojoDatabaseHandlerExt.deleteTable(recordingTableName)
+        pojoDatabaseHandlerExt.closeConnection()
     }
 
     companion object {
