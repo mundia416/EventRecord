@@ -12,7 +12,7 @@ import com.nosetrap.storage.sql.*
 /**
  * keeps track of the number of initialised objects
  */
-class RecorderManager private constructor(context: Context){
+class RecorderManager private constructor(private val context: Context){
 
     /**
      * this class is a helper class which is used to help set a single recorderCalback for multiple
@@ -224,7 +224,9 @@ class RecorderManager private constructor(context: Context){
         val recordingTableName = IDUtil.toRecordingTableName(recordingId)
         databaseHandlerExtension.removeRows(tableNameRecorderRecordings,
                 "$colRecordingTableName == '$recordingTableName'")
-        databaseHandler.deleteTable(recordingTableName)
+
+        val pojo = Pojo(context,recordingTableName)
+        pojo.releaseAll()
     }
 
     companion object {
