@@ -24,6 +24,7 @@ class OService : DraggableOverlayService() {
     private lateinit var playbackOnTouchListener:DraggableOverlayOnTouchListener
 
     private lateinit var recorder: ActionRecorder<RecordingData>
+    private val recorderId = 1
 
         override fun code(intent: Intent) {
         val view = inflateView(R.layout.overlay)
@@ -36,13 +37,13 @@ class OService : DraggableOverlayService() {
                 PixelFormat.TRANSLUCENT)
 
         val recorderManager = RecorderManager.getInstance(this)
-        recorderManager.releaseAll()
+        recorderManager.deleteRecordings(recorderId)
 
         windowManager.addView(view, params)
 
 
         //prepare the action trigger
-        recorder = ActionRecorder(this)
+        recorder = ActionRecorder(this,recorderId)
         val trigger = view.findViewById<Switch>(R.id.trigger)
 
         trigger.setOnCheckedChangeListener { _, isChecked ->
@@ -84,21 +85,20 @@ class OService : DraggableOverlayService() {
         playbackOnTouchListener.setOnDragListener(onDragListener)
         playButtonOnTouchListener.setOnDragListener(onDragListener)
 
-
-        //setting onClickListeners
-        playbackOnTouchListener.setOnClickListener(View.OnClickListener {
+            playbackOnTouchListener.setOnClickListener(View.OnClickListener {
             if(recorder.isInPlayBackMode){
                 recorder.stopPlayback()
             }else{
-                recorder.startPlayback(onActionTrigger)
+                val recordings = recorderManager.getRecordings(recorderId)
+                recorder.togglePlayback(recordings[0].id,onActionTrigger)
             }
         })
-        //playback button
+
         playButtonOnTouchListener.setOnClickListener(View.OnClickListener {
             if(recorder.isInRecordMode){
                 recorder.stopRecording()
+                recorder.saveToDatabase("Sample")
             }else{
-                recorder.clearRecordingData()
                 recorder.startRecording()
             }
         })
@@ -120,7 +120,7 @@ class OService : DraggableOverlayService() {
 
             override fun onRecordingSaved() {
                 super.onRecordingSaved()
-                Toast.makeText(this@OService,"Saved Recording",Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@OService,"Saved SavedRecording",Toast.LENGTH_SHORT).show()
 
             }
 
@@ -130,7 +130,7 @@ class OService : DraggableOverlayService() {
 
             override fun onRecordingStopped() {
                 super.onRecordingStopped()
-                Toast.makeText(this@OService,"Stopped Recording",Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@OService,"Stopped SavedRecording",Toast.LENGTH_SHORT).show()
 
             }
 
@@ -147,7 +147,7 @@ class OService : DraggableOverlayService() {
 
             override fun onRecordingStarted() {
                 super.onRecordingStarted()
-                Toast.makeText(this@OService,"Started Recording",Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@OService,"Started SavedRecording",Toast.LENGTH_SHORT).show()
             }
 
 

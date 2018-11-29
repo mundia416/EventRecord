@@ -6,12 +6,14 @@ import android.os.Handler
 import android.os.Message
 import com.nosetrap.eventrecordlib.ActionTriggerListener
 import com.nosetrap.eventrecordlib.callback.RecorderCallback
-import com.nosetrap.eventrecordlib.util.PlaybackUtil
+import com.nosetrap.eventrecordlib.data.SavedRecording
+import com.nosetrap.eventrecordlib.util.IDUtil
+import com.nosetrap.storage.pojo.PojoExtension
 
 /**
  * action recorder that records the actions with the time between actions being calculated in realtime (elapsed real time)
  */
-class ActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
+class ActionRecorder<T>(private val context: Context,private val id: Int) : BaseActionRecorder<T>(context,id) {
 
     /**
      *
@@ -68,7 +70,6 @@ class ActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
     fun stopRecording() {
         isInRecordMode = false
         (recorderCallback as RecorderCallback).onRecordingStopped()
-        saveToDatabase()
     }
 
 
@@ -126,9 +127,12 @@ class ActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
     /**
      * insert the recorded data into the database
      */
-    private fun saveToDatabase(){
+    fun saveToDatabase(title: String? = null){
         Thread(Runnable {
             try {
+                val recordingID = recorderManager.totalRecordingsCount
+                val pojo = PojoExtension(context,IDUtil.toRecordingTableName(recordingID))
+
                 for (entry in entries) {
                     val entryKey = keyPojoData + pojo.count
                     pojo.insert(entryKey, entry)
@@ -139,9 +143,11 @@ class ActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
                     msg.data = data
                     handlerSaveProgress.sendMessage(msg)
                 }
+
                 pojo.closeConnection()
+                val savedRecording = SavedRecording(recordingID,title,System.currentTimeMillis())
+                recorderManager.recordingCreated(id,savedRecording)
                 handlerSaveComplete.sendEmptyMessage(0)
-                playbackReadyListener.onReady()
             }catch (e: Exception){
                 lastKnownException = e
                 errorHandler.sendEmptyMessage(0)
@@ -152,9 +158,10 @@ class ActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
 
     /**
      * @param dataClassType the class of the pojo to recieve in the onTrigger method
+     * @param recordingId is the id of the recording to playback
      *
      */
-    fun startPlayback(actionTriggerListener: ActionTriggerListener) {
+    fun togglePlayback(recordingId: Int,actionTriggerListener: ActionTriggerListener) {
         this.actionTriggerListener = actionTriggerListener
         isInPlayBackMode = true
 
@@ -164,7 +171,7 @@ class ActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
         if(isInRecordMode) {
             stopRecording()
         }else{
-            playbackReadyListener.onReady()
+            playbackReadyListener.onReady(recordingId)
         }
     }
 }

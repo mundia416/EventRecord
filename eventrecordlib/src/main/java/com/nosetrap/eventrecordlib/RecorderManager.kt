@@ -3,10 +3,11 @@ package com.nosetrap.eventrecordlib
 import android.content.ContentValues
 import android.content.Context
 import com.nosetrap.eventrecordlib.callback.RecorderCallback
+import com.nosetrap.eventrecordlib.data.SavedRecording
 import com.nosetrap.eventrecordlib.recorder.ActionRecorder
-import com.nosetrap.storage.sql.CursorCallback
-import com.nosetrap.storage.sql.DatabaseHandler
-import com.nosetrap.storage.sql.EasyCursor
+import com.nosetrap.eventrecordlib.util.IDUtil
+import com.nosetrap.storage.pojo.Pojo
+import com.nosetrap.storage.sql.*
 
 /**
  * keeps track of the number of initialised objects
@@ -106,79 +107,125 @@ class RecorderManager private constructor(context: Context){
 
     }
 
-    /*
-     * keeps count of how many ActionRecorders have been created,this is useful for deciding
-     * the name of the sql table
+    /**
+     *returns the total number of recording tables saved, this is useful when deciding the name of the
+     * next recording
      */
-      var activeRecorderCount: Int = 0
+      var totalRecordingsCount: Int = 0
     private set
     get() {
-        return databaseHandler.getCount(tableNameActionRecorders).toInt()
+        return databaseHandler.getCount(tableNameRecorderRecordings).toInt()
     }
 
-
-
     /**
-     * call to tell the recorderManager that a recorder has been created
+     * @param recordingTableName is the name of the table where the recording has been saved
      */
-    internal fun actionRecorderCreated(recorderTableName: String){
+    internal fun recordingCreated(recorderId: Int,recording: SavedRecording){
         val values = ContentValues()
-        values.put(colName,recorderTableName)
-        databaseHandler.insert(tableNameActionRecorders,values)
+        values.put(colRecorderID,recorderId)
+        values.put(colTimeStamp, recording.timestamp)
+        values.put(colTitle, recording.title)
+        values.put(colRecordingTableName,IDUtil.toRecordingTableName(recording.id))
+        databaseHandler.insert(tableNameRecorderRecordings,values)
     }
 
     /**
-     * the table that stores the names of the overlay recorders
+     * this keeps track of the recordings that have been stored for a specific recorder identified in
+     * the [tableNameActionRecorders] table
      */
-    private val tableNameActionRecorders = "action_recorder_table_names"
+    private val tableNameRecorderRecordings = "recorder_recordings"
 
     /**
-     * stores the table names for the recorder
+     * stores the id of the recorder
      */
-    private val colName = "name"
+    private val colRecorderID = "recorder_ID"
+    /**
+     * stores the name of the table where a recording for an action recorder is stored
+     */
+    private val colRecordingTableName ="recording_table_name"
 
-
+    private val colTimeStamp = "timestamp"
+    private val colTitle = "title"
     private val databaseHandler = DatabaseHandler(context)
+    private val databaseHandlerExtension = DatabaseHandlerExtension(context)
+
 
     init {
-        databaseHandler.createTable(tableNameActionRecorders, arrayOf(colName),null)
+        databaseHandler.createTable(tableNameRecorderRecordings, arrayOf(colRecordingTableName,
+                colTitle,colTimeStamp), arrayOf(colRecorderID))
     }
 
-
-
-
     /**
-     * contains the logic for releaseOverlay and release action
-     * @param
+     * get recording for a specific recorder id
+     * @param recorderId is the id for which to get recordings for
      */
-    private fun release(recorderTable:String){
-        databaseHandler.query(object :CursorCallback{
+     fun getRecordings(recorderId: Int): ArrayList<SavedRecording>{
+        val recordings = ArrayList<SavedRecording>()
+
+        databaseHandler.query(object : CursorCallback{
             override fun onCursorQueried(cursor: EasyCursor) {
-                if(cursor.getCount() > 0){
-                    if (cursor.getCount() > 0) {
-                        cursor.moveToFirst()
-                        for (i in 0..(cursor.getCount() - 1)) {
-                            //delete the table
-                            val tableName = cursor.getString(colName)
-                            databaseHandler.deleteTable(tableName)
-                            //delete the entry in the recorderTable
-                            databaseHandler.removeRows(recorderTable,"$colName = '$tableName'")
-                            cursor.moveToNext()
-                        }
+                cursor.iterate(object : IterateListener{
+                    override fun onNext(cursor: EasyCursor) {
+                        val recordingName = cursor.getString(colRecordingTableName)
+                        val recordingId = IDUtil.getRecordingId(recordingName)
+                        val title = cursor.getString(colTitle)
+                        val timestamp = cursor.getString(colTimeStamp)
+                        val savedRecording = SavedRecording(recordingId,title,timestamp.toLong())
+
+                        recordings.add(savedRecording)
                     }
-                }
+                })
             }
-        },recorderTable)
+        },tableNameRecorderRecordings,null, "$colRecorderID == $recorderId")
+
+        return recordings
     }
 
     /**
-     * gets rid of all resources that are being used by all the recorders
-     * i.e deletes database tables
+     * gets rid of all the recordings for all the recorders
      */
-    fun releaseAll(){
-        release(tableNameActionRecorders)
+     fun clearRecordingData() {
+        databaseHandlerExtension.query(object : CursorCallback{
+            override fun onCursorQueried(cursor: EasyCursor) {
+                cursor.iterate(object : IterateListener{
+                    override fun onNext(cursor: EasyCursor) {
+                        val recordingTableName = cursor.getString(colRecordingTableName)
+                        databaseHandlerExtension.deleteTable(recordingTableName)
+                    }
+                })
+            }
+        },tableNameRecorderRecordings,arrayOf(colRecordingTableName))
+        databaseHandlerExtension.closeConnection()
     }
 
+        /**
+     * gets rid of all the recordings of a recorder
+     */
+    fun deleteRecordings(recorderId: Int){
+        databaseHandlerExtension.query(object : CursorCallback{
+            override fun onCursorQueried(cursor: EasyCursor) {
+                cursor.iterate(object : IterateListener{
+                    override fun onNext(cursor: EasyCursor) {
+                        val recordingTableName = cursor.getString(colRecordingTableName)
+                        databaseHandlerExtension.deleteTable(recordingTableName)
+
+                    }
+                })
+            }
+        },tableNameRecorderRecordings,
+                arrayOf(colRecordingTableName),"$colRecorderID == $recorderId")
+        databaseHandlerExtension.closeConnection()
+    }
+
+    /**
+     *
+     */
+    fun deleteRecording(recordingId: Int){
+        val recordingTableName = IDUtil.toRecordingTableName(recordingId)
+        databaseHandlerExtension.removeRows(tableNameRecorderRecordings,
+                "$colRecordingTableName == $recordingTableName")
+        databaseHandler.deleteTable(recordingTableName)
+    }
 
     companion object {
         private var uniqueInstance: RecorderManager? = null

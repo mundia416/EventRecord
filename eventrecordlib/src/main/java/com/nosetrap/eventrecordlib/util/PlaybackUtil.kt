@@ -1,18 +1,18 @@
 package com.nosetrap.eventrecordlib.util
 
-import android.os.Bundle
+import android.content.Context
 import android.os.Handler
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.nosetrap.eventrecordlib.ActionTriggerListener
-import com.nosetrap.eventrecordlib.recorder.ActionRecorder
 import com.nosetrap.eventrecordlib.recorder.BaseActionRecorder
+import com.nosetrap.storage.pojo.PojoExtension
 
 /**
  * utility class to handle playback function
  * @classType T specify the type of pojo object that is being played back
  */
-internal class PlaybackUtil<T>(private val actionRecorder: BaseActionRecorder<T>) {
+internal class PlaybackUtil<T>(private val context:Context,private val actionRecorder: BaseActionRecorder<T>) {
     /**
      * an array that holds all the data that was recorded into the database
      */
@@ -76,32 +76,33 @@ internal class PlaybackUtil<T>(private val actionRecorder: BaseActionRecorder<T>
 
     /**
      * @param dataClassType the class of the pojo to recieve in the onTrigger method
+     * @param recordingTableName is the table where the recording is stored
      *
      */
-    fun startPlayback(actionTriggerListener: ActionTriggerListener){
+    fun startPlayback(recordingTableName: String,actionTriggerListener: ActionTriggerListener){
         this.actionTriggerListener = actionTriggerListener
         entryArray = ArrayList()
         currentMoveIndex = 0
         currentPlaybackRun = 0
 
-        getThread().start()
+        getThread(recordingTableName).start()
     }
 
     /**
      *initialise the thread that handles playback
      *querring the database and looping through the data is all done in a background thread
      * */
-    private fun getThread(): Thread{
+    private fun getThread(recordingTableName: String): Thread{
         return Thread(Runnable {
             try {
-
-                for (i in 0..(actionRecorder.pojo.count - 1)) {
+                val pojo = PojoExtension(context,recordingTableName)
+                for (i in 0..(pojo.count - 1)) {
                     val key = actionRecorder.keyPojoData + i
                     val typeToken = object: TypeToken<BaseActionRecorder.ActionPerformedEntry<T>>() {}.type
-                    val dataEntry = actionRecorder.pojo.get<BaseActionRecorder.ActionPerformedEntry<T>>(key, typeToken)
+                    val dataEntry = pojo.get<BaseActionRecorder.ActionPerformedEntry<T>>(key, typeToken)
                     entryArray.add(dataEntry)
                 }
-                actionRecorder.pojo.closeConnection()
+                pojo.closeConnection()
                 playbackStartedHandler.sendEmptyMessage(0)
 
                 //loop through the data in a background thread
@@ -146,6 +147,11 @@ internal class PlaybackUtil<T>(private val actionRecorder: BaseActionRecorder<T>
         /**
          * is called after a recording has been saved, this is when the recorder is ready to playback
          */
-        fun onReady()
+        fun onReady(recordingId: Int)
+
+        /**
+         * is called after a recording has been saved, this is when the recorder is ready to playback
+         */
+        fun onReady(recordingTableName: String)
     }
 }

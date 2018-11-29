@@ -69,7 +69,7 @@ class MainActivity : Activity() {
     }
 
     override fun initVariables() {
-        fRecorder = FixedActionRecorder(this)
+        fRecorder = FixedActionRecorder(this,200)
 
     }
 

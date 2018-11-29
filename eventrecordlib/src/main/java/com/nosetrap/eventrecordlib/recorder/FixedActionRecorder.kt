@@ -3,13 +3,17 @@ package com.nosetrap.eventrecordlib.recorder
 import android.content.Context
 import com.nosetrap.eventrecordlib.ActionTriggerListener
 import com.nosetrap.eventrecordlib.callback.FixedRecorderCallback
+import com.nosetrap.storage.pojo.Pojo
 
 /**
  * action recorder that records the actions with the time between actions being fixed
  * the duration between actions is manually set
+ * each recorder id can only store 1 recording unlike the action recorder which can store multiple recorders
  */
-class FixedActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) {
+class FixedActionRecorder<T>(context: Context,id: Int) : BaseActionRecorder<T>(context,id) {
 
+    private val pojoTableName = "fixed_action_recorder_$id"
+    private val pojo = Pojo(context,pojoTableName)
     /**
      *  set a recorder callback
      */
@@ -42,7 +46,7 @@ class FixedActionRecorder<T>(context: Context) : BaseActionRecorder<T>(context) 
 
         recorderCallback?.onPrePlayback()
 
-        playbackReadyListener.onReady()
+        playbackReadyListener.onReady(pojoTableName)
     }
 
     /**

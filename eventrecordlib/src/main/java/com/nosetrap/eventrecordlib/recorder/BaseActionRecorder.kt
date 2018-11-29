@@ -5,24 +5,23 @@ import android.os.Handler
 import com.nosetrap.eventrecordlib.ActionTriggerListener
 import com.nosetrap.eventrecordlib.RecorderManager
 import com.nosetrap.eventrecordlib.callback.BaseRecorderCallback
-import com.nosetrap.eventrecordlib.callback.RecorderCallback
+import com.nosetrap.eventrecordlib.util.IDUtil
 import com.nosetrap.eventrecordlib.util.PlaybackUtil
-import com.nosetrap.storage.pojo.PojoExtension
-import com.nosetrap.storage.sql.DatabaseHandler
+import com.nosetrap.storage.pojo.Pojo
 
 /**
  * base class for action recorders
  *  * @classType T specifies the pojo object class type which will be used to store data
+ *  @param id represents a single id which will be used to identify a recorder, no 2 IDs should ever
+ *  have the same ID
  */
-abstract class BaseActionRecorder<T>(context: Context) {
+abstract class BaseActionRecorder<T>(private val context: Context,id: Int) {
     companion object {
         /**
          * playback unlimited times
          */
         const val PLAYBACK_UNLIMITED = -1
     }
-
-    protected val tableName: String
 
     /**
      * shows the current times it has played back
@@ -41,7 +40,7 @@ abstract class BaseActionRecorder<T>(context: Context) {
      */
     protected var  actionTriggerListener: ActionTriggerListener? = null
 
-    private val playbackUtil = PlaybackUtil<T>(this)
+    private val playbackUtil = PlaybackUtil<T>(context,this)
 
     /**
      * the recorder callback to receive callback methods
@@ -54,9 +53,7 @@ abstract class BaseActionRecorder<T>(context: Context) {
      */
     internal val keyPojoData = "pojo_key_entry_"
 
-    internal val pojo: PojoExtension
-    //protected val databaseHandler = DatabaseHandler(context)
-
+    protected val recorderManager = RecorderManager.getInstance(context)
 
     /**
      *  determines whether the actions are being played back or not
@@ -71,32 +68,6 @@ abstract class BaseActionRecorder<T>(context: Context) {
         true
     })
 
-    init {
-        val recorderManager = RecorderManager.getInstance(context)
-        tableName = "action_record_data_${recorderManager.activeRecorderCount}"
-        recorderManager.actionRecorderCreated(tableName)
-       // databaseHandler.createTable(tableName, arrayOf("b"),null)
-        pojo = PojoExtension(context, tableName)
-    }
-
-    /**
-     * get rid of all the recording data that is stored in the database
-     */
-    open fun clearRecordingData() {
-       // databaseHandler.clearTable(tableName)
-        pojo.releaseAll()
-        pojo.closeConnection()
-    }
-
-    /**
-     * releases any resources that are being used by this recorder
-     */
-    fun release() {
-       // databaseHandler.deleteTable(tableName)
-        pojo.releaseAll()
-        pojo.closeConnection()
-    }
-
     /**
      * come out of playback mode
      */
@@ -109,20 +80,30 @@ abstract class BaseActionRecorder<T>(context: Context) {
      * is called to start the playback when its ready
      */
     internal val playbackReadyListener = object: PlaybackUtil.PlaybackReadyListener{
-        override fun onReady() {
-            if(isInPlayBackMode) {
-                playbackUtil.startPlayback(actionTriggerListener!!)
-            }
+        override fun onReady(recordingTableName: String) {
+            startPlayback(recordingTableName)
+        }
+
+        override fun onReady(recordingId: Int) {
+           startPlayback(IDUtil.toRecordingTableName(recordingId))
         }
     }
 
     /**
-     * get the number of entries that are currently in the database
+     *
      */
-    fun getEntryCount(): Long{
-       val count = pojo.count
-        pojo.closeConnection()
-        return count
+     private fun startPlayback(recordingTableName: String) {
+        if (isInPlayBackMode) {
+            playbackUtil.startPlayback(recordingTableName, actionTriggerListener!!)
+        }
+    }
+
+    /**
+     * get the number of entries that are currently in a recording
+     */
+    fun getEntryCount(recordingId: Int): Long{
+        val pojo = Pojo(context,IDUtil.toRecordingTableName(recordingId))
+       return pojo.count
     }
 
     /**
